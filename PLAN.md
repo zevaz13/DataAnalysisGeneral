@@ -29,6 +29,10 @@ Crowd-sourced cappuccino-affordability dataset. Raw xlsx read in place from
 - [x] `02_basic_plotting.ipynb`: correlation (Pearson r) + linear fit (scipy `linregress`) for the price-vs-wage scatter, all countries and restricted to >8 entries
 - [x] Box plots for cappuccino price GBP and hourly wage GBP, USA/UK/Australia, grouped by urban/suburban/rural (multi-label rows counted in every class they list)
 ## CI3
+- [x] `02_basic_plotting.ipynb`: cappuccino index (local_index_min) by urban classification box plots, USA/UK/Australia, same multi-label-exploded population as the CI2 price/wage box plots, with sample size (n) annotated above each box to show the index spread against how much data backs it (Rural consistently has the fewest entries across all three countries)
+
+## next
+
 - [ ] Decide concrete plot/analysis questions for modeling stage, e.g.:
   - urban vs suburban vs rural index comparison, within-country (candidate countries with ≥10 entries per class: Australia, Canada, Germany, Ireland, UK, USA)
   - GBP-denominated country rankings under different historical FX snapshots (note: the index itself, price/wage ratio, is FX-invariant — only absolute £ comparisons would move; convert.py supports this)
