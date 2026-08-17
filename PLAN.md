@@ -25,6 +25,10 @@ Crowd-sourced cappuccino-affordability dataset. Raw xlsx read in place from
   - mean price/wage (GBP) + index per country table
   - cappuccino price vs. hourly wage (GBP) scatter, all countries and restricted to >8 entries
 - [x] `scripts/convert.py` — `convert_to_usd(amount, currency_code, date=None)`, ECB rates via frankfurter.dev (30/65 currencies covered), verified against latest + historical dates + unsupported-currency error case
+## CI2
+- [x] `02_basic_plotting.ipynb`: correlation (Pearson r) + linear fit (scipy `linregress`) for the price-vs-wage scatter, all countries and restricted to >8 entries
+- [x] Box plots for cappuccino price GBP and hourly wage GBP, USA/UK/Australia, grouped by urban/suburban/rural (multi-label rows counted in every class they list)
+## CI3
 - [ ] Decide concrete plot/analysis questions for modeling stage, e.g.:
   - urban vs suburban vs rural index comparison, within-country (candidate countries with ≥10 entries per class: Australia, Canada, Germany, Ireland, UK, USA)
   - GBP-denominated country rankings under different historical FX snapshots (note: the index itself, price/wage ratio, is FX-invariant — only absolute £ comparisons would move; convert.py supports this)
