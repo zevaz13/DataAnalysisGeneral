@@ -38,17 +38,32 @@ is the session (no letter = session 1, `b` = session 2; the plan's `c`/session
   pools trials across every run of the session; `trials='all'/'first2'/'last2'`,
   where first2/last2 = pre-/post-grid), `normalize_grid`/`normalized_grid`
   (`method='percent'/'db'/'zscore'`, baseline reduced to its mean, z-score also
-  uses its std), and `subjects_in_group`/`mean_grid_across_subjects` for
-  cross-subject aggregation (one session at a time, so 2-session subjects
-  aren't double-counted)
-- `scripts/plotting.py` — heatmaps, red on x-axis and green on y-axis throughout:
+  uses its std), `subjects_in_group`/`mean_grid_across_subjects`/`group_grid`
+  for cross-subject aggregation (`group_grid` composes the first two; one
+  session at a time, so 2-session subjects aren't double-counted), and
+  `interpolate_grid(grid, (n_red, n_green))` to resize a grid to an arbitrary
+  (including rectangular) resolution via linear interpolation
+- `scripts/plotting.py` — heatmaps, red on x-axis and green on y-axis throughout
+  (axis labels/ticks only -- the underlying grid array and pixel data are
+  plotted as-is, unchanged):
   - `plot_run`/`plot_all_runs`/`plot_mean_run` — single subject
-  - `plot_mean_across_subjects`/`plot_subjects_side_by_side` — across subjects,
-    filtered by `group`/`subgroup` or an explicit `sub_ids` list
+  - `plot_mean_across_subjects`/`plot_subjects_side_by_side`/`plot_group_all_methods` —
+    across subjects, filtered by `group`/`subgroup` or an explicit `sub_ids`
+    list; `plot_group_all_methods` shows one group's raw + percent/db/zscore
+    maps side by side, each independently color-scaled (different numeric
+    scales, not comparable on one shared axis)
+  - `plot_groups_side_by_side` — one panel per named category (mixing group
+    and/or subgroup filters), titled with each category's sample size, e.g.
+    `[{"label": "PD", "group": "PD"}, {"label": "protan", "subgroup": "protan"}]`
+  - `plot_interpolated_grid(grid, (n_red, n_green), ...)` — heatmap of any
+    already-computed grid resized via `interpolate_grid`, same orientation
+    convention as every other function here (no data transpose, red on x /
+    green on y), generalized to an arbitrary, including rectangular, resolution
   - every function takes an optional `normalize={scope, trials, method}` dict
-    (raw if omitted) plus `clim=(vmin, vmax)` and `cmap` overrides; the
-    multi-panel functions (`plot_all_runs`, `plot_subjects_side_by_side`) share
-    one auto-computed color scale across all their panels unless `clim` is given
+    (raw if omitted) plus `clim=(vmin, vmax)` and `cmap` overrides; multi-panel
+    functions share one auto-computed color scale across all their panels
+    unless `clim` is given, and wrap to at most 5 columns per row
+    (`plot_subjects_side_by_side`, `plot_groups_side_by_side`)
   - raw values use a sequential blue colormap (magnitude); normalized values use
     a diverging blue/red colormap centered on zero (signed), per the dataviz
     skill's default palette
@@ -76,3 +91,6 @@ is the session (no letter = session 1, `b` = session 2; the plan's `c`/session
   all runs, mean across runs, ragged 3-run `MET037`), color-limit/colormap
   overrides, and cross-subject aggregation (grand mean, group mean, subjects
   side by side)
+- `notebooks/03_group_comparisons.ipynb` — `PD`/`HC`(=`CTR`)/`CVD`/`protan`/`deutan`,
+  each with all normalization methods and an interpolated 100x100 view, plus
+  `PD`/`HC`/`protan`/`deutan` side by side with sample sizes

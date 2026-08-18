@@ -7,6 +7,7 @@ import os
 
 import numpy as np
 import pandas as pd
+from scipy.interpolate import RegularGridInterpolator
 
 FILES_DIR = os.path.join(os.path.dirname(__file__), "..", "files")
 
@@ -119,3 +120,31 @@ def mean_grid_across_subjects(
     """Mean of each subject's own mean-across-runs grid (each subject weighted equally)."""
     grids = [mean_grid(runmap_df, baselines_df, sub_id, session, normalize=normalize) for sub_id in sub_ids]
     return np.mean(grids, axis=0)
+
+
+def group_grid(
+    runmap_df: pd.DataFrame,
+    baselines_df: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    session: int,
+    *,
+    group: str | None = None,
+    subgroup: str | None = None,
+    normalize: dict | None = None,
+) -> np.ndarray:
+    """Aggregated mean grid across every subject at this session matching
+    group/subgroup (every subject at that session if neither is given).
+    Convenience wrapper composing subjects_in_group + mean_grid_across_subjects
+    for reuse outside of plotting (e.g. further stats, group difference maps)."""
+    sub_ids = subjects_in_group(metadata_df, session, group=group, subgroup=subgroup)
+    return mean_grid_across_subjects(runmap_df, baselines_df, sub_ids, session, normalize=normalize)
+
+
+def interpolate_grid(grid: np.ndarray, shape: tuple[int, int], *, method: str = "linear") -> np.ndarray:
+    """Resize a (red_idx, green_idx) grid to a new (n_red, n_green) resolution."""
+    n_red, n_green = grid.shape
+    interpolator = RegularGridInterpolator((np.arange(n_red), np.arange(n_green)), grid, method=method)
+    new_red_n, new_green_n = shape
+    red_q, green_q = np.linspace(0, n_red - 1, new_red_n), np.linspace(0, n_green - 1, new_green_n)
+    query_red, query_green = np.meshgrid(red_q, green_q, indexing="ij")
+    return interpolator(np.stack([query_red.ravel(), query_green.ravel()], axis=-1)).reshape(new_red_n, new_green_n)
