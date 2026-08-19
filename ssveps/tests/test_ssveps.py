@@ -115,6 +115,57 @@ def test_ragged_three_run_subject(data):
     assert analysis.mean_grid(runmap, baselines, "MET037", 1).shape == (10, 10)
 
 
+# --- trough surface fit ---
+
+
+def test_ramp_gaussian_converges_on_every_subject(data, axes):
+    """The reason it replaced the paraboloid: it converges on all 62 rows.
+    Converging is not the same as locating a dip -- see at_bound below."""
+    runmap, baselines, meta = data
+    red_vals, green_vals = axes
+    for row in meta.to_dict("records"):
+        grid = analysis.mean_grid(runmap, baselines, row["sub_id"], row["session"],
+                                  normalize=analysis.DEFAULT_NORMALIZE)
+        assert not np.isnan(analysis.fit_ramp_gaussian(grid, red_vals, green_vals)["r_squared"])
+
+
+def test_at_bound_fit_is_not_reported_valid(axes):
+    """A monotonic ramp has no interior dip; the fit pegs at an edge and must
+    say so. This is the protan case -- their trough sits beyond max(red)."""
+    red_vals, green_vals = axes
+    x, y = np.meshgrid(red_vals, green_vals, indexing="ij")
+    grid = 2.0 - 0.0004 * x  # pure ramp, no dip anywhere in range
+    fit = analysis.fit_ramp_gaussian(grid, red_vals, green_vals)
+    assert fit["at_bound"]
+    assert not fit["fit_valid"]
+
+
+def test_ramp_gaussian_recovers_a_known_dip(axes):
+    """Fit a surface we constructed, and check it finds the planted dip."""
+    red_vals, green_vals = axes
+    x, y = np.meshgrid(red_vals, green_vals, indexing="ij")
+    truth = dict(x0=2000.0, y0=900.0, amp=0.5, sx=600.0, sy=400.0)
+    grid = (1.5 - 0.0001 * x - 0.00005 * y
+            - truth["amp"] * np.exp(-(((x - truth["x0"]) ** 2) / (2 * truth["sx"] ** 2)
+                                      + ((y - truth["y0"]) ** 2) / (2 * truth["sy"] ** 2))))
+    fit = analysis.fit_ramp_gaussian(grid, red_vals, green_vals)
+    assert fit["fit_valid"]
+    assert fit["red"] == pytest.approx(truth["x0"], abs=60)
+    assert fit["green"] == pytest.approx(truth["y0"], abs=60)
+    assert fit["amp"] == pytest.approx(truth["amp"], rel=0.1)
+    assert fit["r_squared"] > 0.999
+
+
+def test_fit_trough_surface_methods_share_a_schema(axes):
+    """Every method returns the same keys, so subject_troughs' columns are stable."""
+    red_vals, green_vals = axes
+    x, y = np.meshgrid(red_vals, green_vals, indexing="ij")
+    grid = (x - 1600.0) ** 2 / 1e6 + (y - 1000.0) ** 2 / 1e6
+    keys = {"red", "green", "depth", "amp", "sigma_red", "sigma_green", "r_squared", "at_bound", "fit_valid"}
+    for method in ("ramp_gaussian", "paraboloid", "gaussian"):
+        assert set(analysis.fit_trough_surface(grid, red_vals, green_vals, method=method)) == keys
+
+
 # --- permutation testing ---------------------------------------------------
 
 

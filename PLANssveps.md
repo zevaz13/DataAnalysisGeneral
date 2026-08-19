@@ -48,9 +48,9 @@ Next up:
   coordinates, and the subsampling fix changed M3's results. `02_plots.ipynb`
   also has stale pre-wrapping output (cell 18 stores all 21 CTR panels in one
   6729px-wide row).
-- [ ] **Replace the trough surface fit** (2.4) with a ramp + bounded Gaussian
-  dip: 62/62 valid vs 37/62, median r2 0.650 vs 0.578, and it yields trough
-  width as a new per-subject feature.
+- [ ] **Work through `docs/ssvep_analyses.md`** -- seven proposed analyses,
+  ordered. Start with the CVD-gamut finding (the only well-powered effect,
+  p=0.0019) and the reliability-first outcome selection.
 
 Cleanup:
 
@@ -63,6 +63,13 @@ Cleanup:
 
 ## Done since the review
 
+- [x] **Trough surface fit replaced** (2.4) with `fit_ramp_gaussian` (linear
+  ramp + bounded Gaussian dip), now the default. Converges on 62/62 rows and
+  adds `fitted_amp`/`fitted_sigma_red`/`fitted_sigma_green`. Also added
+  `fitted_at_bound`, which surfaced that most CVD subjects' troughs lie beyond
+  the sampled red range -- see `docs/ssvep_analyses.md` section 2.
+- [x] **`docs/ssvep_analyses.md`** -- seven proposed analyses with the
+  supporting measurements.
 - [x] **Red/green axis naming fixed at the source** (2.1). `loader.to_rows`
   reads `runMap[green_idx, red_idx, run]`; `_plot_heatmap` displays `grid.T`.
   Every heatmap verified pixel-identical before/after; HC's trough now reads
