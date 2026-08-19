@@ -42,21 +42,39 @@ baseline_vals.mean()`:
 `scope`/`trials` selects the same trial subset for both the mean and the
 spread.
 
-## Axis convention: red = x, green = y, no transpose
+## Axis convention: grids are [red_idx, green_idx], transposed for display
 
-Every grid array is indexed `[red_idx, green_idx]` and plotted with
-`imshow(grid, origin='lower')` -- **no transpose**, red always the x-axis,
-green always the y-axis. Only the tick labels map index -> physical value.
+Every grid array in this codebase is indexed `[red_idx, green_idx]`, and every
+plot puts red on the x axis and green on the y axis. Because `imshow` puts an
+array's axis 0 on the *y* axis, `plotting._plot_heatmap` displays `grid.T`.
 
-This was validated, not assumed: an independently-produced CTR-group
-reference image (`ssveps/CTRdata.png`, different software) was decoded
-pixel-by-pixel and compared against this pipeline's output -- **r=0.99,
-MSE=0.0005**. `analysis.interpolate_grid` (used for upsampling to a finer
-resolution) does its own dimensionally-correct transpose internally to
-support rectangular target shapes, but the *displayed* orientation after
-that transpose still matches this same convention -- confirmed by checking
-that interpolating back to the native 10x10 resolution reproduces the
-non-interpolated plot exactly (max abs diff 0.0).
+**The raw `runMap` array is the other way round**: its first axis is green and
+its second is red, despite `mapDIM` reporting `RED_GREEN_RUN`.
+`loader.to_rows` unpacks it in that order and emits truthful `red_idx` /
+`green_idx` columns, so this is the one place the raw layout is visible and
+everything downstream is consistent.
+
+This was established three ways, after an earlier version of the code took
+`mapDIM` at face value and had red and green swapped in every reported
+coordinate (the heatmaps were unaffected -- they were drawn correctly by a
+compensating error):
+
+1. The MATLAB templates plot with `imagesc(redArray, greenArray, M)`
+   (`group_permTesting_01JULY25.m:124`, `ICC_grids_22oct25.m:94`), and MATLAB
+   maps an array's *columns* to x. So `M`'s rows are green -- and `M` comes
+   straight from `runMap` with no transpose (`computeICC_gridMaps.m:25-33`).
+2. `ssveps/CTRdata.png`, an independently produced reference for the CTR group,
+   has its minimum at red 2133 / green 889. This pipeline now reports exactly
+   that for CTR at session 1; the earlier code reported 1422 / 1333.
+3. Decoding that image cell-by-cell and correlating against this pipeline's
+   grid gives r=0.92 in this orientation and r=0.70 transposed.
+
+Note that a correlation against the reference image cannot by itself validate
+the *naming* -- the rendered pixels are identical either way. That is what let
+the original error survive an r=0.99 image check. `ssveps/tests/test_ssveps.py`
+pins the orientation at both ends: `test_loader_reads_runmap_green_first`
+against the raw `.mat`, and `test_ctr_trough_matches_reference_image` against
+the reference's coordinates.
 
 ## Trough depth: normalized by default
 
@@ -136,14 +154,23 @@ matching the template's own progression):
 - `permutation_test_directional` -- separates positive- and negative-going
   clusters, each with its own one-tailed null and size+weight correction.
 
-**Subsampling is deliberate, not a bug** (confirmed): every permutation
-subsamples both groups down to `n1`/`n2` subjects (default: both balanced to
-the smaller group's full size) before shuffling labels, rather than using the
-full unequal group sizes every time. This compensates for the smaller
-groups' low sample size and keeps each permutation's null comparison
-structurally identical to the real comparison. The *observed* difference map
-still uses every available subject in each group -- only the
-null-distribution-generating permutations are subsampled.
+**No subject is discarded.** `n1`/`n2` (how many subjects each permutation
+draws per group) default to the **full group sizes**, so each permutation is a
+plain relabelling of everyone, computed over exactly the subjects the observed
+difference map uses.
+
+This is a deliberate departure from the MATLAB templates, which hardcoded a
+subsample per comparison (`group_permTesting_01JULY25.m` used 30 of 33 HC and
+5 of 7 CVD). An earlier version of this code generalized that to "balance both
+groups to the smaller one's size", which was much more aggressive than the
+template ever was -- for PD vs CTR at session 1 it drew 6 of 21 controls,
+throwing away 15 subjects. Discarding subjects widens the null distribution
+and shrinks every z-score: measured on that comparison, max |z| fell from 1.81
+to 1.43. It also leaves the permuted statistic computed at a different sample
+size than the observed one, which a permutation null should not do.
+
+`n1`/`n2` remain parameters, so the template's behaviour can still be
+reproduced deliberately.
 
 **One correctness fix vs. the template** (confirmed): in
 `group_permTesting_positive_negative_clusters.m`, the negative-cluster null

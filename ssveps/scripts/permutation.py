@@ -13,14 +13,20 @@ one function):
   - permutation_test_weighted    -- groupPermTesting_clustSize_custWeight.m
   - permutation_test_directional -- group_permTesting_positive_negative_clusters.m
 
-Every permutation subsamples both groups down to n1/n2 subjects (default:
-both balanced to the smaller group's full size) before shuffling labels --
-confirmed deliberate (not a bug): with very unequal group sizes, keeping
-every permutation's split at the same, balanced sizes as the real comparison
-keeps the null distribution comparable to the observed statistic, rather than
-swamped by the larger group. The *observed* difference map still uses every
-available subject in each group -- only the null-generating permutations are
-subsampled.
+n1/n2 control how many subjects each permutation draws from each group before
+shuffling labels. **They default to the full group sizes, so no subject is
+discarded** and each permutation is a plain relabelling of everyone -- the
+standard permutation test, and the same set of subjects the observed
+difference map is computed from.
+
+The MATLAB templates hardcoded a subsample per comparison (e.g. 30 of 33 HC
+vs 5 of 7 CVD in group_permTesting_01JULY25.m). n1/n2 are kept as parameters
+so that behaviour can be reproduced, but subsampling is not the default:
+discarding subjects widens the null distribution and shrinks every z-score,
+making the test more conservative for no gain. Measured on PD vs CTR at
+session 1 (6 vs 21 subjects), drawing a balanced 6 vs 6 dropped max |z| from
+1.81 to 1.43. Note also that any n1/n2 below the full group size makes the
+permuted statistic sample-size-mismatched against the observed one.
 
 One correctness fix vs. the template (confirmed): permutation_test_directional's
 negative-cluster null uses each permutation's most extreme (min, i.e. most
@@ -50,7 +56,10 @@ def _null_diff_maps(grids1: np.ndarray, grids2: np.ndarray, n1: int, n2: int, n_
     """n_perm permuted (fake-group-A mean - fake-group-B mean) maps: each
     permutation independently draws n1/n2 subjects (without replacement) from
     the FULL pool of grids1/grids2, pools them, then randomly reassigns n1/n2
-    fake group labels across the pooled subsample."""
+    fake group labels across the pooled subsample.
+
+    With the default n1/n2 (the full group sizes) the draw keeps everyone and
+    the step reduces to a plain shuffle of the real group labels."""
     diffs = np.empty((n_perm, *grids1.shape[1:]))
     condlabels = np.arange(n1 + n2) >= n1  # False = fake group A (n1), True = fake group B (n2)
     for i in range(n_perm):
@@ -113,9 +122,8 @@ def _setup(
     grids1 = _group_grid_stack(runmap_df, baselines_df, metadata_df, session, group=group1, subgroup=subgroup1, normalize=normalize)
     grids2 = _group_grid_stack(runmap_df, baselines_df, metadata_df, session, group=group2, subgroup=subgroup2, normalize=normalize)
 
-    balanced_n = min(len(grids1), len(grids2))
-    n1 = balanced_n if n1 is None else n1
-    n2 = balanced_n if n2 is None else n2
+    n1 = len(grids1) if n1 is None else n1
+    n2 = len(grids2) if n2 is None else n2
 
     rng = np.random.default_rng(seed)
     obsdiff = grids1.mean(axis=0) - grids2.mean(axis=0)
@@ -133,7 +141,7 @@ def permutation_test_size(
     group1: str | None = None, subgroup1: str | None = None,
     group2: str | None = None, subgroup2: str | None = None,
     normalize: dict | None = DEFAULT_NORMALIZE,
-    n1: int | None = None, n2: int | None = None,
+    n1: int | None = None, n2: int | None = None,  # subjects drawn per permutation; default = full group sizes
     n_perm: int = 1000, pval: float = 0.05, seed: int | None = None,
 ) -> dict:
     """Cluster-size-corrected two-tailed permutation test between two groups'
@@ -173,7 +181,7 @@ def permutation_test_weighted(
     group1: str | None = None, subgroup1: str | None = None,
     group2: str | None = None, subgroup2: str | None = None,
     normalize: dict | None = DEFAULT_NORMALIZE,
-    n1: int | None = None, n2: int | None = None,
+    n1: int | None = None, n2: int | None = None,  # subjects drawn per permutation; default = full group sizes
     n_perm: int = 1000, pval: float = 0.05, seed: int | None = None,
 ) -> dict:
     """Adds cluster-weight (sum of |z| in the cluster) correction alongside
@@ -227,7 +235,7 @@ def permutation_test_directional(
     group1: str | None = None, subgroup1: str | None = None,
     group2: str | None = None, subgroup2: str | None = None,
     normalize: dict | None = DEFAULT_NORMALIZE,
-    n1: int | None = None, n2: int | None = None,
+    n1: int | None = None, n2: int | None = None,  # subjects drawn per permutation; default = full group sizes
     n_perm: int = 1000, pval: float = 0.05, seed: int | None = None,
 ) -> dict:
     """Separates positive- and negative-going clusters, each corrected by both

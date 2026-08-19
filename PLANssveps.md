@@ -1,78 +1,84 @@
-## SSVEP project
-data located in '/home/sebas/data/ssveps'. These are matlab files. Each file has information about SSVEPs for a grid experiment. METxxx is the unique subject id. the letter a, b, or c tells information about the session number (sessions 1, 2 or 3 respectively).
-### Milestone 1 (M1)
-- [x] Scaffold `ssveps/` (README.md, notebooks/, scripts/)
-- [x] `scripts/loader.py` — `load_ssvep(path)`, plain `scipy.io.loadmat` wrapper (files are non-v7.3, no HDF5 needed)
-- [x] `notebooks/01_explore.ipynb` — loads and inspects `MET000.mat`
-  - `SubID`, `session`, `group`, `subgroup`, `baseDIM`, `mapDIM` — labels/scalars
-  - `redArray`, `greenArray` — 10-level grid axes (0-3200 red, 0-2000 green)
-  - `runMap` — `(10, 10, 4)` = red x green x run
-  - `baselines` — `(4, 4)` per `baseDIM` (`TR_RUN`)
-- [x] `ssveps/files/metadata.csv` — one row per file (62): `filename, sub_id, session, group, subgroup`. Confirmed group/subgroup/SubID are stable per subject across sessions (0 conflicts across 43 subjects)
-- [x] `ssveps/files/grid.json` — shared `redArray`, `greenArray`, `baseDIM`, `mapDIM`. Confirmed byte-identical across all 62 files, so one copy suffices
-- [x] Decided: extract into tidy long-format CSVs rather than keep raw structs (user choice, over per-file .npz or raw-.mat-only)
-  - `ssveps/files/runmap.csv` (24,200 rows) — `sub_id, session, run, red_idx, green_idx, value`
-  - `ssveps/files/baselines.csv` (968 rows) — `sub_id, session, run, trial, value`
-  - handles the ragged run count naturally: `MET037-040` (group `PD`) have only 3 runs instead of 4, so they just contribute fewer rows
-  - `ssveps/scripts/build_derived.py` builds all of the above from the raw `.mat` files (reproducible, rerun anytime)
-- [x] Confirmed semantics before building: baseline trials 1-2 = pre-grid, 3-4 = post-grid; baseVal for percent/db = mean of selected trials (consistent with z-score's mean/std); session-level normalization pools baseline trials across all runs of that session
-- [x] `ssveps/scripts/analysis.py` — data access + normalization on the tidy CSVs
-  - `raw_grid(runmap_df, sub_id, session, run)`, `mean_raw_grid(runmap_df, sub_id, session)` — 10x10 grids
-  - `baseline_values(baselines_df, sub_id, session, scope='run'|'session', run=, trials='all'|'first2'|'last2')`
-  - `normalize_grid(raw, baseline_vals, method='percent'|'db'|'zscore')` and `normalized_grid(...)` combining both steps
-- [x] `ssveps/scripts/plotting.py` — `plot_run`, `plot_all_runs`, `plot_mean_run`, each taking an optional `normalize={scope, trials, method}` dict, so raw and every normalization strategy reuse the same three plot functions (satisfies "repeat all the plots above with different normalization strategies" without duplicating them)
-  - raw = sequential blue colormap (magnitude); normalized = diverging blue/red colormap centered on zero (signed) — dataviz skill's default palette
-  - `plot_all_runs`/mean read the run count from the data, so the ragged 3-run subjects (`MET037-040`) plot correctly
-- [x] `ssveps/notebooks/02_plots.ipynb` — demonstrates all of the above: raw single run/all runs/mean for `MET000`, the ragged `MET037` case, and normalized examples across scope/trials/method combinations
-- [x] Investigated before fixing: `metadata.csv`'s newer mtime + `MET043-046` showing `group=CVD, subgroup=deutan/protan` there while their raw `.mat` files still say `UNKNOWN/NA` confirmed this was a direct hand-edit to `metadata.csv`, already agreeing with what was added -- runmap.csv/baselines.csv (built after the raw files' last real change) were already consistent too. Nothing needed correcting; the real risk was a future rebuild silently wiping the edit, addressed below.
-- [x] `scripts/update_derived.py` — incremental pipeline (item 28): new subject-session -> added directly; existing -> `[y/N]` prompt, and if overwritten only `runmap.csv`/`baselines.csv` are refreshed -- `metadata.csv`'s group/subgroup is set once at first creation and never touched afterward (your choice: preserve hand-set metadata permanently over always-refresh-from-raw). Verified with 3 isolated tests: (1) full no-op run against the real data with every prompt answered "no" produces byte-identical output (also caught and fixed two real bugs this surfaced: pandas silently turning the literal string "NA" into blank via default NA-parsing, and pandas' to_csv not round-tripping float64 precision by default -- both fixed), (2) a brand-new subject gets added cleanly, (3) overwriting an existing subject with changed raw data refreshes runmap.csv but leaves metadata.csv's group untouched
-- [x] `scripts/build_derived.py` kept as the full-from-scratch rebuild (will still wipe hand-edits -- documented as intentional-reset-only); both scripts now share row-extraction logic via `loader.to_rows()`
-- [x] Fixed `plot_run`/`plot_all_runs`/`plot_mean_run` axis labels: red is now labeled on the x-axis, green on the y-axis (was swapped) -- **labels/ticks only, the underlying grid array is plotted as-is with no transpose** (first pass wrongly transposed the pixel data too; caught and corrected per your report -- the map's information was already right, only the label text was wrong). All three take optional `clim=(vmin, vmax)` and `cmap` overrides; `plot_all_runs` now auto-computes and shares one color scale across all its panels by default (previously each run panel scaled independently -- the bug you found)
-- [x] New cross-subject aggregate plots in `scripts/analysis.py` (`mean_grid`, `subjects_in_group`, `mean_grid_across_subjects`) and `scripts/plotting.py`:
-  - `plot_mean_across_subjects` — grand mean (no filter), or filtered by `group`/`subgroup`, or an explicit `sub_ids` list
-  - `plot_subjects_side_by_side` — one panel per subject (each subject's own mean-across-runs grid), same filtering options, shared color scale by default
-  - both take `normalize`/`clim`/`cmap` like the single-subject plots, and operate on one fixed `session` shared across the whole group/list (your choice, so 2-session subjects aren't double-counted)
-- [x] `ssveps/notebooks/02_plots.ipynb` updated: axis-fixed raw/normalized plots, a clim/cmap override demo, grand mean, CVD group mean, CVD side-by-side (confirms `MET043-046` now included correctly), and an explicit-list side-by-side example
-- [x] `plot_subjects_side_by_side` (and the new `plot_groups_side_by_side`) now wrap into rows of at most 5 panels via a shared `_multi_panel_figure` helper, instead of one ever-widening row
-- [x] `analysis.group_grid(runmap_df, baselines_df, metadata_df, session, group=, subgroup=, normalize=)` — composes `subjects_in_group` + `mean_grid_across_subjects` into one call returning a bare aggregated grid (raw or normalized), for reuse outside plotting
-- [x] `analysis.interpolate_grid(grid, (n_red, n_green), method='linear')` + `plotting.plot_interpolated_grid(...)` — resizes any grid to an arbitrary, including rectangular, resolution. **Caught and fixed a real design issue before implementing**: the existing 10x10 plots' "label-only swap" (no data transpose, confirmed correct for square grids) would mismatch axis lengths for a rectangular request like 20x30, so this new function does a real, dimensionally-correct transpose internally instead (your choice) -- verified both square (100x100) and rectangular (20x30) shapes produce correctly-oriented output. Interpolation method: linear (your choice, to avoid cubic overshoot shifting the apparent location of minima/maxima)
-- [x] `plotting.plot_group_all_methods(...)` — one group's raw + percent/db/zscore maps side by side (each independently color-scaled, since raw and normalized values aren't on the same numeric scale) -- built to cleanly support item 39 with a single reusable function
-- [x] `plotting.plot_groups_side_by_side(runmap_df, baselines_df, metadata_df, session, categories, ...)` — one panel per named category (list of `{"label", "group", "subgroup"}` dicts, so group- and subgroup-based categories can mix in one figure), titled with each category's sample size (n) -- built to cleanly support item 41
-- [x] `ssveps/notebooks/03_group_comparisons.ipynb` (new): `PD`/`HC`(=`CTR`, confirmed)/`CVD`/`protan`/`deutan` each with `plot_group_all_methods` (raw + all 3 normalization methods) and an interpolated 100x100 raw view, plus `PD`/`HC`/`protan`/`deutan` side by side via `plot_groups_side_by_side` (CVD-combined omitted from the side-by-side per your item 41 list, since protan+deutan already cover it)
-- [x] **Resolved**: you provided `ssveps/CTRdata.png`, an independently-produced CTR-group plot from different software, confirmed correct. Decoded its exact pixel values (colorbar-based color-to-value inverse mapping) and compared cell-by-cell against `plot_mean_across_subjects(..., group='CTR')`'s actual rendered+labeled output: **r=0.99, MSE=0.0005** -- matches almost exactly. The earlier "rule of thumb" mismatch was a false alarm: even your own reference's minimum (red=2133, green=889) doesn't land inside the stated red[1600,2000] box either (green=889 does fall in [700,1000]) -- both mine and the reference sit in the same broad, flat trough (values differing by ~0.005, noise-level) where the exact single minimum pixel is sensitive to that flatness rather than indicating any systematic error. No bug; pipeline validated against independent ground truth.
-- [x] Fixed `plot_interpolated_grid`'s orientation: it was independently re-transposing the data, which double-corrected against the (now-validated) convention that the other plots' "no transpose, red=x/green=y" labeling is simply *correct*, not a square-grid-only hack -- verified interpolating to the native 10x10 resolution now reproduces `plot_mean_across_subjects`'s rendering exactly (max abs diff 0.0), and correlation with the independent reference image stays at 0.99 after the fix. Also added a shared `clim` across `03_group_comparisons.ipynb`'s 5 interpolated group panels so they're visually comparable on one scale (the function's own `clim` param already existed; this wires it up across a set of related panels the way the other multi-panel functions already do)
-### M2. Further visual comparisons between groups. 
-- [x] New notebook `ssveps/notebooks/04_distributions.ipynb`, boxplots/histograms for `MET000`/session 1 and the `PD`/`HC`(=CTR)/`protan`/`deutan` categories (same convention as `03_group_comparisons.ipynb`, HD excluded, n=1)
-  - [x] `analysis.flatten_runs(runmap_df, baselines_df, sub_id, session, normalize=)` — concatenates every run's grid into one 1D array (400 for 4-run subjects, 300 for the ragged 3-run ones, verified against `MET037`/`MET000`); boxplot for one participant via `plotting.plot_subject_boxplot` (your choice: raw and normalized shown as **separate figures/calls**, not combined side by side, since `normalize` is just a dict param you can swap per call rather than a fixed list baked into one function)
-  - [x] Mean-grid version: first `mean_grid` (average over runs), then `.ravel()` to 1x100 — `plotting.plot_subject_mean_boxplot`, raw and % change as two separate calls
-  - [x] `plotting.plot_subject_histogram` / `plot_subject_mean_histogram` — histogram twins of the two boxplot functions above
-  - [x] `plotting.plot_subjects_boxplot` / `plot_subjects_mean_boxplot` — one box per subject in a group, side by side (per-run-flatten and mean-grid flavors respectively), figure width auto-scales with subject count (verified on CTR, n=21 at session 1)
-  - [x] `analysis.pooled_pixels(runmap_df, baselines_df, sub_ids, session, normalize=)` — `flatten_runs` concatenated across every subject in a group (pooled, not averaged); single-box group plots via `plotting.plot_group_pooled_boxplot` (this) and `plot_group_mean_boxplot` (existing `mean_grid_across_subjects(...).ravel()` -- the group's mean-of-subject-means grid, 100 cells)
-  - [x] `plotting.plot_groups_pooled_boxplot` / `plot_groups_mean_boxplot` — one box per category, all groups in the same plot, using the pooled and mean-grid strategies above respectively; `categories` is the same `{"label", "group", "subgroup"}` list convention as `plot_groups_side_by_side`
-  - [x] Shared low-level helpers `_boxplot`/`_histogram` in `plotting.py` (mirrors the existing `_plot_heatmap` pattern) — one uniform solid fill color (`DISTRIBUTION_COLOR`, pulled from the existing sequential-blue ramp) across every box/bar, since category identity is already carried by the x-axis tick labels (dataviz skill: identity shouldn't be color-alone-redundant on a static one-series chart)
-  - [x] Smoke-tested every new function against the real data (ragged-subject lengths, all 10 plot functions render without error) and visually reviewed sample outputs (single-subject box, 21-subject CTR side-by-side, 4-group pooled comparison) before committing to the notebook
-  - [x] Extract each subject's/group's minimum location + depth into a quantitative summary table -- turns the "trough" we've been visualizing into a per-subject feature that supports the statistical comparison above (e.g. is the trough shifted or shallower in PD vs CTR?). `analysis.trough_location(grid, red_vals, green_vals)` (argmin on the native 10x10 grid, no interpolation -- your choice, since M4's parametric surface fit is the planned proper fix for the grid's coarseness) + `subject_troughs`/`group_troughs` wrapping it per (sub_id, session) and per (session, category). Depth defaults to % change from baseline (`DEFAULT_TROUGH_NORMALIZE`, your choice -- raw magnitude isn't comparable across subjects), `normalize` still a parameter like everywhere else. Persisted (your choice, for reuse by M3) via new `scripts/build_troughs.py` to `ssveps/files/subject_troughs.csv` (62 rows) and `group_troughs.csv` (7 rows -- deutan has 0 subjects at session 2, so that combination is skipped rather than erroring). Added `analysis.load_grid_axes()` (grid.json reader) and refactored `plotting._grid_axes` to reuse it instead of duplicating the JSON read. New `plotting.plot_trough_scatter(troughs_df, label_col)`, demoed in `04_distributions.ipynb`: uses marker **shape**, not color, per category -- the dataviz skill's palette notes flag that a scatter's all-pairs color comparisons only stay CVD-safe up to 3 categories, and this needs 4 (PD/HC/protan/deutan)
-  - [x] `docs/methods.md` -- analysis conventions from M1+M2: baseline pre-/post-grid trial split, the three normalization formulas, the validated red=x/green=y axis convention (r=0.99 against independent ground truth), trough depth defaulting to normalized, and the metadata hand-edit-preservation policy
-  - [x] `docs/api_reference.md` -- every public function in `loader.py`/`analysis.py`/`plotting.py`/the build scripts: where it lives, its parameters, and its return value. Generated from the functions' actual signatures/docstrings (via `inspect`) rather than hand-transcribed, so it can't drift from the real signatures at write time
+# SSVEP project plan
 
-### M3. Permutation testing between groups
-- [x] Statistical comparison between groups (PD vs CTR, protan vs deutan vs CTR), not just visual: cell-wise testing across the 10x10 grid needs a multiple-comparisons-aware method (e.g. cluster-based permutation testing, standard for this kind of topographic grid data) rather than 100 independent t-tests. I have added matlab template code for a similar type of approach as matlab code I wrote some time ago. The number of subjects was less, and all the analysis was restricted to CTR vs CVD (protan or deutan).
-  - [x] Replicate the functionalities presented in the template code. New `scripts/permutation.py`: 3 functions, one per sophistication level in `templateCode/permTestingcomparisons/` (your choice: kept as 3 separate functions rather than 1 collapsed one, matching the template's own progression) -- `permutation_test_size` (`group_permTesting_01JULY25.m`), `permutation_test_weighted` (`groupPermTesting_clustSize_custWeight.m`), `permutation_test_directional` (`group_permTesting_positive_negative_clusters.m`). All generalized via `group`/`subgroup` params reusing `subjects_in_group`/`mean_grid`, instead of the template's 6 scripts with copy-pasted, hardcoded per-comparison subject lists. Verified against real data (PD/protan/deutan vs HC at session 1): reproducible with a fixed seed, sensible cluster sizes/weights/p-values, correction behaving as expected (e.g. a p=0.033 cluster correctly failing the stricter pval/2-adjusted two-tailed threshold)
-  - [x] Suggest improvements to these functionalities.
-    - Confirmed **not** a bug (your correction): every permutation subsamples both groups to a fixed n1/n2 rather than using the full unequal group sizes -- deliberate, to compensate for the smaller groups' low sample size and keep the null distribution comparable to the observed statistic. Replicated as a parameter (`n1`/`n2`), defaulting to both groups balanced to the smaller group's full size rather than the template's hardcoded magic numbers per comparison
-    - **Fixed** (your confirmation): `group_permTesting_positive_negative_clusters.m`'s negative-cluster null used `max()` over an array of negative sums, which picks the *weakest* (closest-to-zero) cluster per permutation rather than the most extreme -- biased the negative null toward small magnitudes, making the negative-cluster correction too lenient. `permutation_test_directional` uses `min()` for the negative tail, symmetric with the positive tail's `max()`
-    - Added a `seed` parameter to all three functions for reproducibility (the original MATLAB scripts never seeded their RNG)
-    - Added per-cluster p-values to `permutation_test_directional` (the template only computed these for the non-directional size+weight script), extending the same logic to the positive/negative-separated case
-  - [x] `ssveps/notebooks/05_permutation_testing.ipynb` -- all 3 levels demonstrated: size-only and size+weight correction on protan vs HC, then the full directional method on PD/protan/deutan vs HC (your chosen M2-matching categories) at session 1, plus null-distribution histograms
-  - [x] Documented in `docs/methods.md` (cluster-permutation methodology, the subsampling rationale, the negative-cluster fix) and `docs/api_reference.md` (all 3 functions' signatures/params/returns)
-### M4.
-- [x] Fit a parametric surface (e.g. 2D Gaussian or paraboloid) per subject as a more robust, noise-resistant alternative to raw-grid argmin for locating the trough -- the native grid is coarse (10x10) and individual subjects are noisy. `analysis.fit_paraboloid` (closed-form linear least squares) and `fit_gaussian` (nonlinear, `scipy.optimize.curve_fit`, seeded from the grid argmin), both behind `fit_trough_surface(..., method='paraboloid'|'gaussian')` (your choice: implement both rather than pick one). Both report `fit_valid` (paraboloid: Hessian must be positive-definite; gaussian: amplitude must be positive; both: fitted location must fall inside the sampled red/green range -- catches saddle points, non-converged fits, and extrapolation) and `r_squared`. `subject_troughs` extended with `fitted_red/fitted_green/fitted_depth/fitted_r_squared/fitted_valid` columns alongside the existing argmin ones (your choice, over a separate file) -- `subject_troughs.csv` rebuilt (paraboloid, the default: more numerically stable). New `ssveps/notebooks/06_trough_surface_fit.ipynb`: single-subject overlay (`plotting.plot_trough_locations`, converts each method's physical red/green location onto the heatmap's pixel-index axes so a fit's off-grid location overlays correctly), the ragged 3-run case, and fit-quality/agreement-with-argmin summaries across all 62 subject/session rows (37/62 valid paraboloid fits; the fitted minimum's *value* is often notably higher than the argmin's, expected given the trough's already-established broad/flat shape, not a bug)
+Raw data: `/home/sebas/data/ssveps/` - 62 MATLAB files, 43 subjects.
+`METxxx` is the subject id; the filename suffix gives the session
+(none = 1, `b` = 2, `c` = 3; no `c` files exist in this dataset).
 
-### M5. Test-retest reliability ICC
-- [x] Session 1 vs session 2 test-retest reliability, for the ~19 subjects with both sessions -- per-subject measure of test-retest reliability ICC. 
-  - [x] /ssveps/templateCode includes an implementation of how this has been done in the past using matlab. We used ICCs to make a ICC grid map indexable over the red and green array. This allows to see what pixels are more or less reliable. please followw these conventions to implement something similar here. New `scripts/reliability.py`, replicating `templateCode/ICCs/computeICC_gridMaps.m`: `paired_subjects` (subjects with both sessions, optional group/subgroup filter -- confirmed 19 total, matching your estimate) + `icc_grid`/`icc_map` (per-pixel ICC across paired subjects' session-1/session-2 mean grids, pivoted to a 10x10 array) + `plot_icc_map` (fixed `[0,1]` scale, matching the template's `clim([0 1])`)
-  - [x] Find a python compatible version of ICC. The one used for matlab, was just a package from mathworks. There must be something similar to that. `pingouin.intraclass_corr` (added via `uv add pingouin`) -- its `'ICC(A,1)'` row is exactly the template's `ICC(...,'A-1')` (McGraw & Wong two-way random, absolute agreement, single measurement), same CI/F/p columns
-  - [x] Do the analysis for all the 19 subjects together. `ssveps/notebooks/07_test_retest_reliability.ipynb` -- mean ICC 0.77 across the whole grid
-  - [x] Repoeat the analysis for participants in differen groups. PD and HC. HC (n=13 paired): mean ICC 0.79. PD (n=4 paired): mean ICC 0.42, visibly noisier map -- read as illustrative given the thin sample, not a robust estimate (flagged in the notebook)
-- [x] Lets brainstorm about how to use measures like bland-altman plots for this analysis. Brainstormed (bounded scope: extends the existing `reliability.py`/`07_test_retest_reliability.ipynb`), then implemented. Two point-selector functions (your choice: both) -- `reliability.example_points_fixed` (the template's 5 hardcoded targets, for comparability with the original MATLAB analysis) and `example_points_informative` (data-driven: each group's own lowest-ICC/highest-ICC/trough pixels). `plotting.plot_bland_altman` (bias + ±1.96 SD limits of agreement) and `plot_session_scatter` (session1 vs session2 + identity line), both via `plot_example_points(..., kind='bland_altman'|'scatter')` (your choice: both plot types). `07_test_retest_reliability.ipynb` refactored to a `GROUP_SPECS`-driven loop (building `groups`/`icc_dfs`/`icc_maps`/`troughs` together) so adding a group is genuinely a one-line change -- caught mid-build that the original ad hoc version wasn't actually that simple (icc_dfs was hand-assembled separately from groups), fixed before it shipped in the docs. Also caught: `icc_grid` on `group='CVD'` (n=2 paired) crashed with a cryptic pingouin internal assertion -- added an explicit `ValueError` (`icc_grid` now requires >=3 paired subjects) naming the real problem; documented in `docs/methods.md` that protan/deutan/CVD don't currently have enough paired subjects for this analysis
-- [x] Documentation pass over all M4/M5 functions and notebooks (`docs/api_reference.md`, `docs/methods.md`) -- every function's entry now includes a "how to use this differently" section spelling out which parameter to change for common variations (raw vs. normalized, paraboloid vs. gaussian, fixed vs. data-driven points, different groups/subjects), not just its signature. Also caught and documented three functions that were implemented but never made it into the docs (`plot_bland_altman`, `plot_session_scatter`, `plot_example_points`, `example_points_fixed`, `example_points_informative`). New `## Notebooks` section in `docs/api_reference.md` indexing all 7 notebooks: what each demonstrates and exactly which variable(s) to edit to point it at different subjects/sessions/groups
+Reference MATLAB implementations live in `ssveps/templateCode/` (gitignored).
+
+## Documents
+
+- `docs/ssvep_summary.md` - what has been built, code review findings, and the
+  suggested order of work. **Read this first.**
+- `docs/methods.md` - analysis conventions (normalization, axes, ICC, permutation).
+- `docs/api_reference.md` - every public function's signature and parameters.
+- `ssveps/README.md` - data dictionary and script/notebook index.
+
+## Completed (M1-M5)
+
+Delivered and in the repo. Detail lives in `docs/ssvep_summary.md` section 1;
+this is the index.
+
+- **M1 - Ingest and visualize.** `loader.py`, `build_derived.py`,
+  `update_derived.py`; tidy CSVs in `ssveps/files/`; three normalizations
+  (percent/db/zscore) over selectable baseline scope and trial subsets;
+  single-subject, group, and interpolated heatmaps. Notebooks 01-03.
+- **M2 - Distributions and trough location.** Boxplots/histograms per subject,
+  per group (pooled and mean-grid); `trough_location` plus persisted
+  `subject_troughs.csv` / `group_troughs.csv`. Notebook 04.
+- **M3 - Cluster-based permutation testing.** Three functions mirroring the
+  three MATLAB templates (size, size+weight, directional), generalized to any
+  group/subgroup pair, seeded, with a corrected negative-cluster null.
+  Notebook 05.
+- **M4 - Parametric trough surface fit.** `fit_paraboloid` and `fit_gaussian`
+  behind `fit_trough_surface`, with `fit_valid` and `r_squared` reported.
+  Notebook 06.
+- **M5 - Test-retest reliability.** Per-pixel ICC(A,1) maps via `pingouin`,
+  paired-subject discovery, Bland-Altman and session-scatter plots.
+  Notebook 07.
+
+## Open issues
+
+From the code review in `docs/ssvep_summary.md` section 2, which carries the
+evidence and the suggested fix for each.
+
+Next up:
+
+- [ ] **Re-run every notebook.** The axis fix changed all reported trough
+  coordinates, and the subsampling fix changed M3's results. `02_plots.ipynb`
+  also has stale pre-wrapping output (cell 18 stores all 21 CTR panels in one
+  6729px-wide row).
+- [ ] **Replace the trough surface fit** (2.4) with a ramp + bounded Gaussian
+  dip: 62/62 valid vs 37/62, median r2 0.650 vs 0.578, and it yields trough
+  width as a new per-subject feature.
+
+Cleanup:
+
+- [ ] Small correctness and consistency items (2.7): permutation p-value `+1`
+  correction, `zscore` `ddof`, `plotting` -> `reliability` import chain,
+  `load_grid_axes` caching, inconsistent `normalize` defaults.
+- [ ] Factor the repeated subject/category resolution in `plotting.py` (2.8).
+- [ ] Repo hygiene (2.9): remove `Untitled Folder/`, decide on notebook
+  outputs, make the notebook import path robust.
+
+## Done since the review
+
+- [x] **Red/green axis naming fixed at the source** (2.1). `loader.to_rows`
+  reads `runMap[green_idx, red_idx, run]`; `_plot_heatmap` displays `grid.T`.
+  Every heatmap verified pixel-identical before/after; HC's trough now reads
+  red 2133 / green 889, matching the reference image.
+- [x] **Test suite added** (2.2). `uv run pytest ssveps/tests -q`, 14 tests,
+  mutation-checked against the axis bug.
+- [x] **Permutation no longer discards subjects** (2.3). `n1`/`n2` default to
+  the full group sizes; they remain parameters for reproducing the templates.
+- [x] **Both build scripts unified** (2.5) onto `loader.write_derived_csv` --
+  verified byte-identical output. Fixed two problems found while verifying: a
+  dtype quirk that silently disabled the float formatting on a first run, and
+  389 committed values that were 1 ULP off the raw data (now regenerated; no
+  scientific change).
+- [x] **`ssveps/README.md` rewritten** to cover M2-M5, and `methods.md`'s
+  permutation section corrected (2.6).
+
+## Next milestones
+
+To be defined together once the blocking issues above are settled.

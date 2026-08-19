@@ -27,6 +27,9 @@ from analysis import (
 )
 from reliability import session_pair_values
 
+# Every multi-panel figure in this module wraps to at most this many panels per
+# row, via _multi_panel_figure. Change it here and every such figure follows;
+# individual calls can override it with _multi_panel_figure(..., max_cols=).
 MAX_PANEL_COLS = 5
 
 SEQUENTIAL_BLUE = LinearSegmentedColormap.from_list("sequential_blue", ["#cde2fb", "#6da7ec", "#256abf", "#0d366b"])
@@ -73,9 +76,9 @@ def _nice_ticks(n: int, vmin: float, vmax: float, *, max_ticks: int = 10) -> tup
 
 
 def _plot_heatmap(ax: plt.Axes, grid: np.ndarray, *, cmap: Colormap, vmin: float, vmax: float, label: str) -> None:
-    """grid is indexed [red_idx, green_idx]; the pixel data is plotted exactly
-    as-is (no transpose) -- only the axis labels/ticks are red-on-x, green-on-y."""
-    im = ax.imshow(grid, origin="lower", cmap=cmap, vmin=vmin, vmax=vmax, aspect="auto")
+    """grid is indexed [red_idx, green_idx]; it is transposed for display so
+    that red lands on x and green on y (imshow puts axis 0 on the y axis)."""
+    im = ax.imshow(grid.T, origin="lower", cmap=cmap, vmin=vmin, vmax=vmax, aspect="auto")
     red_vals, green_vals = load_grid_axes()
     ax.set_xticks(range(len(red_vals)))
     ax.set_xticklabels([f"{v:.0f}" for v in red_vals], rotation=45, ha="right")
@@ -134,8 +137,8 @@ def plot_all_runs(
     resolved_cmap = cmap or _default_cmap(normalize is not None)
     label = _label_for(normalize)
 
-    fig, axes = plt.subplots(1, len(runs), figsize=(4.5 * len(runs), 4))
-    for ax, run, grid in zip(np.atleast_1d(axes), runs, grids):
+    fig, axes = _multi_panel_figure(len(runs))
+    for ax, run, grid in zip(axes, runs, grids):
         _plot_heatmap(ax, grid, cmap=resolved_cmap, vmin=vmin, vmax=vmax, label=label)
         ax.set_title(f"{sub_id} session {session} run {run}")
     fig.suptitle(f"{sub_id} session {session} -- all runs")
@@ -303,18 +306,18 @@ def plot_interpolated_grid(
     normalized, single-subject, or group mean) resized to `shape` =
     (n_red, n_green) via interpolation.
 
-    Same orientation convention as every other plot function here (no data
-    transpose, red on x / green on y) -- just generalized to an arbitrary,
-    including rectangular, resolution.
+    Same orientation convention as every other plot function here (red on x,
+    green on y) -- just generalized to an arbitrary, including rectangular,
+    resolution.
     """
     n_red, n_green = shape
-    interp = interpolate_grid(grid, (n_green, n_red), method=method)
+    interp = interpolate_grid(grid, (n_red, n_green), method=method)
     vmin, vmax = clim if clim is not None else _auto_clim([interp], diverging=diverging)
     red_vals, green_vals = load_grid_axes()
 
     if ax is None:
         _, ax = plt.subplots()
-    im = ax.imshow(interp, origin="lower", cmap=cmap or _default_cmap(diverging), vmin=vmin, vmax=vmax, aspect="auto")
+    im = ax.imshow(interp.T, origin="lower", cmap=cmap or _default_cmap(diverging), vmin=vmin, vmax=vmax, aspect="auto")
     xpos, xlabels = _nice_ticks(n_red, red_vals[0], red_vals[-1])
     ypos, ylabels = _nice_ticks(n_green, green_vals[0], green_vals[-1])
     ax.set_xticks(xpos)

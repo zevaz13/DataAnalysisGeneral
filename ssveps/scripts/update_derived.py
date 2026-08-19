@@ -16,14 +16,10 @@ import os
 
 import pandas as pd
 
-from loader import load_ssvep, to_rows
+from loader import CSV_COLUMNS, load_ssvep, to_rows, write_derived_csv
 
 RAW_DIR = "/home/sebas/data/ssveps"
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "files")
-
-METADATA_COLUMNS = ["filename", "sub_id", "session", "group", "subgroup"]
-RUNMAP_COLUMNS = ["sub_id", "session", "run", "red_idx", "green_idx", "value"]
-BASELINES_COLUMNS = ["sub_id", "session", "run", "trial", "value"]
 
 
 def _read_or_empty(path: str, columns: list[str]) -> pd.DataFrame:
@@ -38,9 +34,9 @@ def main() -> None:
     baselines_path = os.path.join(OUT_DIR, "baselines.csv")
     grid_path = os.path.join(OUT_DIR, "grid.json")
 
-    metadata_df = _read_or_empty(metadata_path, METADATA_COLUMNS)
-    runmap_df = _read_or_empty(runmap_path, RUNMAP_COLUMNS)
-    baselines_df = _read_or_empty(baselines_path, BASELINES_COLUMNS)
+    metadata_df = _read_or_empty(metadata_path, CSV_COLUMNS["metadata"])
+    runmap_df = _read_or_empty(runmap_path, CSV_COLUMNS["runmap"])
+    baselines_df = _read_or_empty(baselines_path, CSV_COLUMNS["baselines"])
     grid = json.load(open(grid_path)) if os.path.exists(grid_path) else None
 
     existing_keys = set(zip(metadata_df["sub_id"], metadata_df["session"]))
@@ -85,13 +81,9 @@ def main() -> None:
     runmap_df = pd.concat([runmap_df, pd.DataFrame(new_runmap_rows)], ignore_index=True)
     baselines_df = pd.concat([baselines_df, pd.DataFrame(new_baselines_rows)], ignore_index=True)
 
-    # float_format="%.17g": pandas' default to_csv formatting does not always
-    # round-trip float64 exactly; 17 significant digits guarantees it does.
-    metadata_df.sort_values(["sub_id", "session"]).to_csv(metadata_path, index=False)
-    runmap_df.sort_values(["sub_id", "session", "run", "red_idx", "green_idx"]).to_csv(
-        runmap_path, index=False, float_format="%.17g"
-    )
-    baselines_df.sort_values(["sub_id", "session", "run", "trial"]).to_csv(baselines_path, index=False, float_format="%.17g")
+    write_derived_csv(metadata_path, metadata_df, "metadata")
+    write_derived_csv(runmap_path, runmap_df, "runmap")
+    write_derived_csv(baselines_path, baselines_df, "baselines")
     with open(grid_path, "w") as f:
         json.dump(grid, f, indent=2)
 
