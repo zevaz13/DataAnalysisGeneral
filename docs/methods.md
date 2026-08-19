@@ -1,6 +1,6 @@
 # SSVEP grid analysis: conventions
 
-Established during M1/M2 of the SSVEP project (`ssveps/`). These are the
+Established during M1-M3 of the SSVEP project (`ssveps/`). These are the
 non-obvious decisions and conventions that are easy to get wrong if
 re-derived from scratch -- see `PLANssveps.md` for the full history and
 reasoning behind each.
@@ -65,9 +65,49 @@ subject's/group's minimum on the native 10x10 grid (argmin, no
 interpolation -- a proper noise-resistant localization via a parametric
 surface fit is planned for M4, so interpolating now would be a throwaway
 half-measure). Depth defaults to **% change from baseline**
-(`analysis.DEFAULT_TROUGH_NORMALIZE`), not raw value, because raw SSVEP
+(`analysis.DEFAULT_NORMALIZE`), not raw value, because raw SSVEP
 amplitude varies a lot subject-to-subject and isn't comparable across
 subjects/groups -- pass `normalize=None` for raw depth instead.
+`DEFAULT_NORMALIZE` is the same constant `permutation.py`'s functions default
+to, for the same reason.
+
+## Cluster-based permutation testing (M3)
+
+`permutation.py` replicates `ssveps/templateCode/permTestingcomparisons/*.m`
+-- cluster-based permutation testing (Maris & Oostenveld style) between two
+groups' mean grids, generalized to any `group`/`subgroup` pair instead of the
+template's hardcoded-subject-list scripts. Three functions, one per
+sophistication level in the template (kept separate, not collapsed into one,
+matching the template's own progression):
+
+- `permutation_test_size` -- two-tailed z-threshold, clusters kept only if
+  their size exceeds the null distribution's 95th percentile.
+- `permutation_test_weighted` -- adds a second correction criterion (cluster
+  weight = sum of `|z|` in the cluster) and a per-cluster p-value.
+- `permutation_test_directional` -- separates positive- and negative-going
+  clusters, each with its own one-tailed null and size+weight correction.
+
+**Subsampling is deliberate, not a bug** (confirmed): every permutation
+subsamples both groups down to `n1`/`n2` subjects (default: both balanced to
+the smaller group's full size) before shuffling labels, rather than using the
+full unequal group sizes every time. This compensates for the smaller
+groups' low sample size and keeps each permutation's null comparison
+structurally identical to the real comparison. The *observed* difference map
+still uses every available subject in each group -- only the
+null-distribution-generating permutations are subsampled.
+
+**One correctness fix vs. the template** (confirmed): in
+`group_permTesting_positive_negative_clusters.m`, the negative-cluster null
+used `max()` over an array of negative cluster-weight sums -- which picks the
+value *closest to zero* (the weakest negative cluster) rather than the most
+extreme one. This biased the negative null toward small magnitudes, making
+the negative-cluster significance threshold too lenient. `permutation_test_
+directional` uses `min()` for the negative tail, symmetric with the positive
+tail's `max()`.
+
+Cluster connectivity is 8-connected (`scipy.ndimage.label` with a full 3x3
+structuring element) to match MATLAB `bwconncomp`'s 2D default -- `scipy`'s
+own default is 4-connected (cross-shaped), so this must be passed explicitly.
 
 ## `metadata.csv`: hand-edits are permanent, and preserved by default
 

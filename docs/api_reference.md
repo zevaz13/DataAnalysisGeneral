@@ -79,15 +79,18 @@ orientation) these functions implement.
 - **`trough_location(grid, red_vals, green_vals) -> dict`**
   `{red, green, depth, red_idx, green_idx}` for a grid's minimum (native
   resolution, `np.argmin`).
-- **`subject_troughs(runmap_df, baselines_df, metadata_df, *, normalize=DEFAULT_TROUGH_NORMALIZE) -> DataFrame`**
+- **`subject_troughs(runmap_df, baselines_df, metadata_df, *, normalize=DEFAULT_NORMALIZE) -> DataFrame`**
   One row per `(sub_id, session)` in `metadata_df`:
   `sub_id, session, group, subgroup, red, green, depth, red_idx, green_idx`.
-- **`group_troughs(runmap_df, baselines_df, metadata_df, sessions, categories, *, normalize=DEFAULT_TROUGH_NORMALIZE) -> DataFrame`**
+- **`group_troughs(runmap_df, baselines_df, metadata_df, sessions, categories, *, normalize=DEFAULT_NORMALIZE) -> DataFrame`**
   One row per `(session, category)` with >=1 subject:
   `label, session, n, red, green, depth, red_idx, green_idx`. `categories` is
   a list of `{"label": str, "group": str|None, "subgroup": str|None}` (same
   shape as `plotting.plot_groups_side_by_side`'s `categories`).
-  `DEFAULT_TROUGH_NORMALIZE = {"scope": "run", "trials": "all", "method": "percent"}`.
+
+`DEFAULT_NORMALIZE = {"scope": "run", "trials": "all", "method": "percent"}`
+-- the standard cross-subject-comparable normalization, also the default for
+every `permutation.py` function below.
 
 ## `plotting.py` -- all figures
 
@@ -145,6 +148,44 @@ labels, not color.
   `group_troughs` table, one marker **shape** per distinct `label_col` value
   (`'group'` or `'label'`) -- shape rather than color, since a scatter's
   all-pairs color comparisons only stay colorblind-safe up to 3 categories.
+
+### Permutation test results (M3)
+
+- **`plot_permutation_result(result, panels, *, title=None, cmap=None) -> Figure`**
+  Generic: one panel per `(result_key, panel_title)` pair from any
+  `permutation.permutation_test_*` result dict, sharing one z-score color
+  scale. The three functions below are thin presets over this.
+- **`plot_permutation_test_size(result, *, title=None, cmap=None) -> Figure`**
+  Panels: difference / uncorrected / cluster-size-corrected.
+- **`plot_permutation_test_weighted(result, *, title=None, cmap=None) -> Figure`**
+  Panels: difference / uncorrected / size-corrected / weight-corrected.
+- **`plot_permutation_test_directional(result, *, title=None, cmap=None) -> Figure`**
+  Panels: difference / uncorrected / size-corrected (+/-) / weight-corrected (+/-).
+- **`plot_permutation_null_histogram(null_values, threshold, *, xlabel, ax=None) -> Axes`**
+  Histogram of a null max-cluster-statistic distribution (e.g.
+  `result['null_sizes']`/`result['null_weights']`) with the threshold marked.
+
+## `permutation.py` -- cluster-based permutation testing (M3)
+
+Replicates `ssveps/templateCode/permTestingcomparisons/*.m`; see
+`docs/methods.md` for the methodology, the subsampling rationale, and the
+negative-cluster fix vs. the template. All three take the same core
+parameters: `runmap_df, baselines_df, metadata_df, session, *, group1=None,
+subgroup1=None, group2=None, subgroup2=None, normalize=DEFAULT_NORMALIZE,
+n1=None, n2=None, n_perm=1000, pval=0.05, seed=None`. `n1`/`n2` default to
+both groups balanced to the smaller group's full size.
+
+- **`permutation_test_size(...) -> dict`**
+  `{zdiff, zthresh_uncorrected, zthresh_corrected, size_thresh, null_sizes, sig_thresh, n1, n2}`.
+- **`permutation_test_weighted(...) -> dict`**
+  `{zdiff, zthresh_uncorrected, zthresh_size_corrected, zthresh_weight_corrected, size_thresh, weight_thresh, null_sizes, null_weights, cluster_results, sig_thresh, n1, n2}`.
+  `cluster_results` is a list of `{size, weight, pvalue}` per observed cluster.
+- **`permutation_test_directional(...) -> dict`**
+  `{zdiff, zthresh_uncorrected, zthresh_size_pos, zthresh_size_neg, zthresh_weight_pos, zthresh_weight_neg, pos_size_thresh, neg_size_thresh, pos_weight_thresh, neg_weight_thresh, null_pos_sizes, null_neg_sizes, null_pos_weights, null_neg_weights, cluster_results, sig_thresh, n1, n2}`.
+  `cluster_results` is a list of `{sign, size, weight, pvalue}` per observed cluster.
+
+All three `z*` arrays are `[red_idx, green_idx]` grids, plottable directly
+with the "Permutation test results" functions above.
 
 ## Build scripts
 

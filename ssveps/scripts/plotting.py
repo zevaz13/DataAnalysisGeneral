@@ -583,3 +583,80 @@ def plot_trough_scatter(troughs_df: pd.DataFrame, label_col: str, *, ax: plt.Axe
     ax.legend(title=label_col)
     ax.set_title("trough locations")
     return ax
+
+
+def plot_permutation_result(
+    result: dict, panels: list[tuple[str, str]], *, title: str | None = None, cmap: Colormap | str | None = None
+) -> plt.Figure:
+    """One panel per (result_key, title) pair from a permutation.permutation_test_*
+    result dict, sharing one z-score color scale across all panels."""
+    grids = [result[key] for key, _ in panels]
+    vmin, vmax = _auto_clim(grids, diverging=True)
+    resolved_cmap = cmap or DIVERGING_BLUE_RED
+    fig, axes = _multi_panel_figure(len(panels))
+    for ax, (key, panel_title) in zip(axes, panels):
+        _plot_heatmap(ax, result[key], cmap=resolved_cmap, vmin=vmin, vmax=vmax, label="z-score")
+        ax.set_title(panel_title)
+    if title:
+        fig.suptitle(title)
+    fig.tight_layout()
+    return fig
+
+
+def plot_permutation_test_size(result: dict, *, title: str | None = None, cmap: Colormap | str | None = None) -> plt.Figure:
+    """Difference / uncorrected / cluster-size-corrected panels, from
+    permutation.permutation_test_size's result dict."""
+    return plot_permutation_result(
+        result,
+        [("zdiff", "difference (z)"), ("zthresh_uncorrected", "uncorrected"), ("zthresh_corrected", "cluster-size corrected")],
+        title=title,
+        cmap=cmap,
+    )
+
+
+def plot_permutation_test_weighted(result: dict, *, title: str | None = None, cmap: Colormap | str | None = None) -> plt.Figure:
+    """Difference / uncorrected / size-corrected / weight-corrected panels,
+    from permutation.permutation_test_weighted's result dict."""
+    return plot_permutation_result(
+        result,
+        [
+            ("zdiff", "difference (z)"),
+            ("zthresh_uncorrected", "uncorrected"),
+            ("zthresh_size_corrected", "size corrected"),
+            ("zthresh_weight_corrected", "weight corrected"),
+        ],
+        title=title,
+        cmap=cmap,
+    )
+
+
+def plot_permutation_test_directional(result: dict, *, title: str | None = None, cmap: Colormap | str | None = None) -> plt.Figure:
+    """Difference / uncorrected / size- and weight-corrected positive and
+    negative panels, from permutation.permutation_test_directional's result dict."""
+    return plot_permutation_result(
+        result,
+        [
+            ("zdiff", "difference (z)"),
+            ("zthresh_uncorrected", "uncorrected"),
+            ("zthresh_size_pos", "size corrected (+)"),
+            ("zthresh_size_neg", "size corrected (-)"),
+            ("zthresh_weight_pos", "weight corrected (+)"),
+            ("zthresh_weight_neg", "weight corrected (-)"),
+        ],
+        title=title,
+        cmap=cmap,
+    )
+
+
+def plot_permutation_null_histogram(null_values: np.ndarray, threshold: float, *, xlabel: str, ax: plt.Axes | None = None) -> plt.Axes:
+    """Histogram of a null max-cluster-statistic distribution (e.g.
+    result['null_sizes'] or result['null_weights']) with the corresponding
+    significance threshold marked."""
+    if ax is None:
+        _, ax = plt.subplots()
+    ax.hist(null_values, bins=30, color=DISTRIBUTION_COLOR, alpha=0.7, edgecolor="white")
+    ax.axvline(threshold, color="black", linestyle="--", label=f"threshold = {threshold:.1f}")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("count (permutations)")
+    ax.legend()
+    return ax

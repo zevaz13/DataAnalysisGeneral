@@ -14,10 +14,11 @@ FILES_DIR = os.path.join(os.path.dirname(__file__), "..", "files")
 
 TRIAL_SUBSETS = {"all": (1, 2, 3, 4), "first2": (1, 2), "last2": (3, 4)}
 
-# Depth is normalized by default (percent change from baseline) since raw SSVEP
-# amplitude varies a lot subject-to-subject, so only normalized depth is
-# comparable across subjects/groups.
-DEFAULT_TROUGH_NORMALIZE = {"scope": "run", "trials": "all", "method": "percent"}
+# Standard cross-subject-comparable normalization (percent change from
+# baseline) -- raw SSVEP amplitude varies a lot subject-to-subject, so
+# anything comparing across subjects/groups (trough depth, permutation
+# testing) defaults to this rather than raw values.
+DEFAULT_NORMALIZE = {"scope": "run", "trials": "all", "method": "percent"}
 
 
 def load_runmap() -> pd.DataFrame:
@@ -212,7 +213,7 @@ def subject_troughs(
     baselines_df: pd.DataFrame,
     metadata_df: pd.DataFrame,
     *,
-    normalize: dict | None = DEFAULT_TROUGH_NORMALIZE,
+    normalize: dict | None = DEFAULT_NORMALIZE,
 ) -> pd.DataFrame:
     """One row per (sub_id, session) in metadata_df: the minimum location and
     depth of that subject's mean-across-runs grid. normalize=None for raw
@@ -233,7 +234,7 @@ def group_troughs(
     sessions: list[int],
     categories: list[dict],
     *,
-    normalize: dict | None = DEFAULT_TROUGH_NORMALIZE,
+    normalize: dict | None = DEFAULT_NORMALIZE,
 ) -> pd.DataFrame:
     """One row per (session, category) with at least one subject: the minimum
     location and depth of that category's mean-of-subject-means grid.
