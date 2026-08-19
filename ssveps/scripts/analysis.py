@@ -84,6 +84,16 @@ def normalized_grid(
     return normalize_grid(raw, bvals, method=method)
 
 
+def _run_grids(
+    runmap_df: pd.DataFrame, baselines_df: pd.DataFrame, sub_id: str, session: int, normalize: dict | None
+) -> list[np.ndarray]:
+    """Each run's grid (raw or normalized) for one subject/session, in run order."""
+    runs = sorted(runmap_df.query("sub_id == @sub_id and session == @session")["run"].unique())
+    if normalize is None:
+        return [raw_grid(runmap_df, sub_id, session, run) for run in runs]
+    return [normalized_grid(runmap_df, baselines_df, sub_id, session, run, **normalize) for run in runs]
+
+
 def mean_grid(
     runmap_df: pd.DataFrame, baselines_df: pd.DataFrame, sub_id: str, session: int, *, normalize: dict | None = None
 ) -> np.ndarray:
@@ -92,9 +102,29 @@ def mean_grid(
     each run is normalized individually, then the runs are averaged)."""
     if normalize is None:
         return mean_raw_grid(runmap_df, sub_id, session)
-    runs = sorted(runmap_df.query("sub_id == @sub_id and session == @session")["run"].unique())
-    grids = [normalized_grid(runmap_df, baselines_df, sub_id, session, run, **normalize) for run in runs]
-    return np.mean(grids, axis=0)
+    return np.mean(_run_grids(runmap_df, baselines_df, sub_id, session, normalize), axis=0)
+
+
+def flatten_runs(
+    runmap_df: pd.DataFrame, baselines_df: pd.DataFrame, sub_id: str, session: int, *, normalize: dict | None = None
+) -> np.ndarray:
+    """Every pixel of every run of one subject/session, concatenated into one
+    1D array (400 values for 4-run subjects, 300 for the ragged 3-run ones)."""
+    grids = _run_grids(runmap_df, baselines_df, sub_id, session, normalize)
+    return np.concatenate([g.ravel() for g in grids])
+
+
+def pooled_pixels(
+    runmap_df: pd.DataFrame,
+    baselines_df: pd.DataFrame,
+    sub_ids: list[str],
+    session: int,
+    *,
+    normalize: dict | None = None,
+) -> np.ndarray:
+    """flatten_runs for every subject in sub_ids, concatenated into one pooled
+    1D array (a group's entire raw pixel distribution, not averaged)."""
+    return np.concatenate([flatten_runs(runmap_df, baselines_df, sub_id, session, normalize=normalize) for sub_id in sub_ids])
 
 
 def subjects_in_group(

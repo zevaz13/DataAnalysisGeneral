@@ -16,7 +16,16 @@ import numpy as np
 import pandas as pd
 from matplotlib.colors import Colormap, LinearSegmentedColormap
 
-from analysis import interpolate_grid, mean_grid, mean_grid_across_subjects, normalized_grid, raw_grid, subjects_in_group
+from analysis import (
+    flatten_runs,
+    interpolate_grid,
+    mean_grid,
+    mean_grid_across_subjects,
+    normalized_grid,
+    pooled_pixels,
+    raw_grid,
+    subjects_in_group,
+)
 
 MAX_PANEL_COLS = 5
 
@@ -24,6 +33,7 @@ FILES_DIR = os.path.join(os.path.dirname(__file__), "..", "files")
 
 SEQUENTIAL_BLUE = LinearSegmentedColormap.from_list("sequential_blue", ["#cde2fb", "#6da7ec", "#256abf", "#0d366b"])
 DIVERGING_BLUE_RED = LinearSegmentedColormap.from_list("diverging_blue_red", ["#2a78d6", "#f0efec", "#e34948"])
+DISTRIBUTION_COLOR = "#256abf"
 
 METHOD_LABELS = {"percent": "% change from baseline", "db": "dB change from baseline", "zscore": "baseline z-score"}
 
@@ -324,4 +334,237 @@ def plot_interpolated_grid(
     plt.colorbar(im, ax=ax, label=label)
     if title:
         ax.set_title(title)
+    return ax
+
+
+def _boxplot(ax: plt.Axes, data: list[np.ndarray], labels: list[str], *, ylabel: str) -> None:
+    """One box per array in data. A single uniform fill color is used throughout
+    -- the x tick labels already carry category identity, so a static one-series
+    chart needs no additional categorical hue."""
+    bp = ax.boxplot(data, tick_labels=labels, patch_artist=True, medianprops={"color": "black"})
+    for patch in bp["boxes"]:
+        patch.set_facecolor(DISTRIBUTION_COLOR)
+        patch.set_alpha(0.7)
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_ha("right")
+    ax.set_ylabel(ylabel)
+
+
+def _histogram(ax: plt.Axes, data: np.ndarray, *, xlabel: str, bins: int) -> None:
+    ax.hist(data, bins=bins, color=DISTRIBUTION_COLOR, alpha=0.7, edgecolor="white")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("count")
+
+
+def plot_subject_boxplot(
+    runmap_df: pd.DataFrame,
+    baselines_df: pd.DataFrame,
+    sub_id: str,
+    session: int,
+    *,
+    normalize: dict | None = None,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """Single box: every pixel of every run of one subject/session (400 values,
+    or 300 for the ragged 3-run subjects)."""
+    data = flatten_runs(runmap_df, baselines_df, sub_id, session, normalize=normalize)
+    if ax is None:
+        _, ax = plt.subplots()
+    _boxplot(ax, [data], [sub_id], ylabel=_label_for(normalize))
+    ax.set_title(f"{sub_id} session {session} -- all-run pixels (n={len(data)})")
+    return ax
+
+
+def plot_subject_mean_boxplot(
+    runmap_df: pd.DataFrame,
+    baselines_df: pd.DataFrame,
+    sub_id: str,
+    session: int,
+    *,
+    normalize: dict | None = None,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """Single box: the 100 cells of one subject's mean-across-runs grid."""
+    data = mean_grid(runmap_df, baselines_df, sub_id, session, normalize=normalize).ravel()
+    if ax is None:
+        _, ax = plt.subplots()
+    _boxplot(ax, [data], [sub_id], ylabel=_label_for(normalize))
+    ax.set_title(f"{sub_id} session {session} -- mean-grid pixels (n={len(data)})")
+    return ax
+
+
+def plot_subject_histogram(
+    runmap_df: pd.DataFrame,
+    baselines_df: pd.DataFrame,
+    sub_id: str,
+    session: int,
+    *,
+    normalize: dict | None = None,
+    bins: int = 30,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """Histogram of every pixel of every run of one subject/session."""
+    data = flatten_runs(runmap_df, baselines_df, sub_id, session, normalize=normalize)
+    if ax is None:
+        _, ax = plt.subplots()
+    _histogram(ax, data, xlabel=_label_for(normalize), bins=bins)
+    ax.set_title(f"{sub_id} session {session} -- all-run pixels (n={len(data)})")
+    return ax
+
+
+def plot_subject_mean_histogram(
+    runmap_df: pd.DataFrame,
+    baselines_df: pd.DataFrame,
+    sub_id: str,
+    session: int,
+    *,
+    normalize: dict | None = None,
+    bins: int = 30,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """Histogram of the 100 cells of one subject's mean-across-runs grid."""
+    data = mean_grid(runmap_df, baselines_df, sub_id, session, normalize=normalize).ravel()
+    if ax is None:
+        _, ax = plt.subplots()
+    _histogram(ax, data, xlabel=_label_for(normalize), bins=bins)
+    ax.set_title(f"{sub_id} session {session} -- mean-grid pixels (n={len(data)})")
+    return ax
+
+
+def plot_subjects_boxplot(
+    runmap_df: pd.DataFrame,
+    baselines_df: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    session: int,
+    *,
+    sub_ids: list[str] | None = None,
+    group: str | None = None,
+    subgroup: str | None = None,
+    normalize: dict | None = None,
+) -> plt.Axes:
+    """One box per subject (that subject's all-run pixel distribution), side by
+    side. Pass sub_ids explicitly, or filter by group/subgroup (metadata_df)."""
+    if sub_ids is None:
+        sub_ids = subjects_in_group(metadata_df, session, group=group, subgroup=subgroup)
+    data = [flatten_runs(runmap_df, baselines_df, sub_id, session, normalize=normalize) for sub_id in sub_ids]
+    _, ax = plt.subplots(figsize=(max(6.0, 0.4 * len(sub_ids)), 4.5))
+    _boxplot(ax, data, sub_ids, ylabel=_label_for(normalize))
+    subtitle = ", ".join(filter(None, [group, subgroup])) or f"{len(sub_ids)} subjects"
+    ax.set_title(f"session {session} -- {subtitle} -- all-run pixels per subject")
+    return ax
+
+
+def plot_subjects_mean_boxplot(
+    runmap_df: pd.DataFrame,
+    baselines_df: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    session: int,
+    *,
+    sub_ids: list[str] | None = None,
+    group: str | None = None,
+    subgroup: str | None = None,
+    normalize: dict | None = None,
+) -> plt.Axes:
+    """One box per subject (that subject's mean-across-runs grid, 100 cells),
+    side by side. Pass sub_ids explicitly, or filter by group/subgroup."""
+    if sub_ids is None:
+        sub_ids = subjects_in_group(metadata_df, session, group=group, subgroup=subgroup)
+    data = [mean_grid(runmap_df, baselines_df, sub_id, session, normalize=normalize).ravel() for sub_id in sub_ids]
+    _, ax = plt.subplots(figsize=(max(6.0, 0.4 * len(sub_ids)), 4.5))
+    _boxplot(ax, data, sub_ids, ylabel=_label_for(normalize))
+    subtitle = ", ".join(filter(None, [group, subgroup])) or f"{len(sub_ids)} subjects"
+    ax.set_title(f"session {session} -- {subtitle} -- mean-grid pixels per subject")
+    return ax
+
+
+def plot_group_pooled_boxplot(
+    runmap_df: pd.DataFrame,
+    baselines_df: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    session: int,
+    *,
+    sub_ids: list[str] | None = None,
+    group: str | None = None,
+    subgroup: str | None = None,
+    normalize: dict | None = None,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """Single box: every pixel of every run of every subject in the group,
+    pooled together (not averaged)."""
+    if sub_ids is None:
+        sub_ids = subjects_in_group(metadata_df, session, group=group, subgroup=subgroup)
+    data = pooled_pixels(runmap_df, baselines_df, sub_ids, session, normalize=normalize)
+    label = ", ".join(filter(None, [group, subgroup])) or f"{len(sub_ids)} subjects"
+    if ax is None:
+        _, ax = plt.subplots()
+    _boxplot(ax, [data], [label], ylabel=_label_for(normalize))
+    ax.set_title(f"session {session} -- {label} pooled pixels (n={len(data)}, {len(sub_ids)} subjects)")
+    return ax
+
+
+def plot_group_mean_boxplot(
+    runmap_df: pd.DataFrame,
+    baselines_df: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    session: int,
+    *,
+    sub_ids: list[str] | None = None,
+    group: str | None = None,
+    subgroup: str | None = None,
+    normalize: dict | None = None,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """Single box: the 100 cells of the group's mean-of-subject-means grid
+    (each subject's own mean-across-runs grid, then averaged across subjects)."""
+    if sub_ids is None:
+        sub_ids = subjects_in_group(metadata_df, session, group=group, subgroup=subgroup)
+    data = mean_grid_across_subjects(runmap_df, baselines_df, sub_ids, session, normalize=normalize).ravel()
+    label = ", ".join(filter(None, [group, subgroup])) or f"{len(sub_ids)} subjects"
+    if ax is None:
+        _, ax = plt.subplots()
+    _boxplot(ax, [data], [label], ylabel=_label_for(normalize))
+    ax.set_title(f"session {session} -- {label} mean-grid pixels (n={len(data)}, {len(sub_ids)} subjects)")
+    return ax
+
+
+def plot_groups_pooled_boxplot(
+    runmap_df: pd.DataFrame,
+    baselines_df: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    session: int,
+    categories: list[dict],
+    *,
+    normalize: dict | None = None,
+) -> plt.Axes:
+    """One box per category (that category's pooled all-run pixel
+    distribution), side by side. categories as in plot_groups_side_by_side."""
+    sub_id_lists = [subjects_in_group(metadata_df, session, group=cat.get("group"), subgroup=cat.get("subgroup")) for cat in categories]
+    data = [pooled_pixels(runmap_df, baselines_df, sub_ids, session, normalize=normalize) for sub_ids in sub_id_lists]
+    labels = [f"{cat['label']} (n={len(sub_ids)})" for cat, sub_ids in zip(categories, sub_id_lists)]
+    _, ax = plt.subplots()
+    _boxplot(ax, data, labels, ylabel=_label_for(normalize))
+    ax.set_title(f"session {session} -- groups pooled pixels")
+    return ax
+
+
+def plot_groups_mean_boxplot(
+    runmap_df: pd.DataFrame,
+    baselines_df: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    session: int,
+    categories: list[dict],
+    *,
+    normalize: dict | None = None,
+) -> plt.Axes:
+    """One box per category (that category's mean-of-subject-means grid, 100
+    cells), side by side. categories as in plot_groups_side_by_side."""
+    sub_id_lists = [subjects_in_group(metadata_df, session, group=cat.get("group"), subgroup=cat.get("subgroup")) for cat in categories]
+    data = [
+        mean_grid_across_subjects(runmap_df, baselines_df, sub_ids, session, normalize=normalize).ravel() for sub_ids in sub_id_lists
+    ]
+    labels = [f"{cat['label']} (n={len(sub_ids)})" for cat, sub_ids in zip(categories, sub_id_lists)]
+    _, ax = plt.subplots()
+    _boxplot(ax, data, labels, ylabel=_label_for(normalize))
+    ax.set_title(f"session {session} -- groups mean-grid pixels")
     return ax
