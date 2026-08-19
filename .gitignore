@@ -9,3 +9,6 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# SSVEP template code (local, not tracked)
+/ssveps/templateCode

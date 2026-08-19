@@ -3,6 +3,7 @@
 Baseline trial order (confirmed): trials 1-2 are pre-grid, 3-4 are post-grid.
 """
 
+import json
 import os
 
 import numpy as np
@@ -12,6 +13,11 @@ from scipy.interpolate import RegularGridInterpolator
 FILES_DIR = os.path.join(os.path.dirname(__file__), "..", "files")
 
 TRIAL_SUBSETS = {"all": (1, 2, 3, 4), "first2": (1, 2), "last2": (3, 4)}
+
+# Depth is normalized by default (percent change from baseline) since raw SSVEP
+# amplitude varies a lot subject-to-subject, so only normalized depth is
+# comparable across subjects/groups.
+DEFAULT_TROUGH_NORMALIZE = {"scope": "run", "trials": "all", "method": "percent"}
 
 
 def load_runmap() -> pd.DataFrame:
@@ -25,6 +31,12 @@ def load_baselines() -> pd.DataFrame:
 def load_metadata() -> pd.DataFrame:
     # keep_default_na=False: subgroup's literal "NA" value must not become NaN
     return pd.read_csv(os.path.join(FILES_DIR, "metadata.csv"), keep_default_na=False)
+
+
+def load_grid_axes() -> tuple[list[float], list[float]]:
+    with open(os.path.join(FILES_DIR, "grid.json")) as f:
+        grid = json.load(f)
+    return grid["redArray"], grid["greenArray"]
 
 
 def raw_grid(runmap_df: pd.DataFrame, sub_id: str, session: int, run: int) -> np.ndarray:
@@ -178,3 +190,63 @@ def interpolate_grid(grid: np.ndarray, shape: tuple[int, int], *, method: str = 
     red_q, green_q = np.linspace(0, n_red - 1, new_red_n), np.linspace(0, n_green - 1, new_green_n)
     query_red, query_green = np.meshgrid(red_q, green_q, indexing="ij")
     return interpolator(np.stack([query_red.ravel(), query_green.ravel()], axis=-1)).reshape(new_red_n, new_green_n)
+
+
+def trough_location(grid: np.ndarray, red_vals: list[float], green_vals: list[float]) -> dict:
+    """Location and depth of a grid's minimum: physical red/green values, their
+    red_idx/green_idx grid positions, and the depth (the minimum value itself).
+    Native grid resolution only -- no interpolation (a finer, noise-resistant
+    localization via a parametric surface fit is planned separately for M4)."""
+    red_idx, green_idx = np.unravel_index(np.argmin(grid), grid.shape)
+    return {
+        "red": red_vals[red_idx],
+        "green": green_vals[green_idx],
+        "depth": grid[red_idx, green_idx],
+        "red_idx": red_idx,
+        "green_idx": green_idx,
+    }
+
+
+def subject_troughs(
+    runmap_df: pd.DataFrame,
+    baselines_df: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    *,
+    normalize: dict | None = DEFAULT_TROUGH_NORMALIZE,
+) -> pd.DataFrame:
+    """One row per (sub_id, session) in metadata_df: the minimum location and
+    depth of that subject's mean-across-runs grid. normalize=None for raw
+    depth, otherwise a scope/trials/method dict as elsewhere."""
+    red_vals, green_vals = load_grid_axes()
+    rows = []
+    for meta in metadata_df.to_dict("records"):
+        grid = mean_grid(runmap_df, baselines_df, meta["sub_id"], meta["session"], normalize=normalize)
+        loc = trough_location(grid, red_vals, green_vals)
+        rows.append({"sub_id": meta["sub_id"], "session": meta["session"], "group": meta["group"], "subgroup": meta["subgroup"], **loc})
+    return pd.DataFrame(rows)
+
+
+def group_troughs(
+    runmap_df: pd.DataFrame,
+    baselines_df: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    sessions: list[int],
+    categories: list[dict],
+    *,
+    normalize: dict | None = DEFAULT_TROUGH_NORMALIZE,
+) -> pd.DataFrame:
+    """One row per (session, category) with at least one subject: the minimum
+    location and depth of that category's mean-of-subject-means grid.
+    categories as in plotting.plot_groups_side_by_side -- categories with no
+    subjects at a given session (e.g. deutan at session 2) are skipped."""
+    red_vals, green_vals = load_grid_axes()
+    rows = []
+    for session in sessions:
+        for cat in categories:
+            sub_ids = subjects_in_group(metadata_df, session, group=cat.get("group"), subgroup=cat.get("subgroup"))
+            if not sub_ids:
+                continue
+            grid = mean_grid_across_subjects(runmap_df, baselines_df, sub_ids, session, normalize=normalize)
+            loc = trough_location(grid, red_vals, green_vals)
+            rows.append({"label": cat["label"], "session": session, "n": len(sub_ids), **loc})
+    return pd.DataFrame(rows)

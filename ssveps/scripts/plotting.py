@@ -8,9 +8,6 @@ and cmap overrides; multi-panel functions use one shared clim/cmap across all
 their panels by default.
 """
 
-import json
-import os
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -19,6 +16,7 @@ from matplotlib.colors import Colormap, LinearSegmentedColormap
 from analysis import (
     flatten_runs,
     interpolate_grid,
+    load_grid_axes,
     mean_grid,
     mean_grid_across_subjects,
     normalized_grid,
@@ -29,19 +27,11 @@ from analysis import (
 
 MAX_PANEL_COLS = 5
 
-FILES_DIR = os.path.join(os.path.dirname(__file__), "..", "files")
-
 SEQUENTIAL_BLUE = LinearSegmentedColormap.from_list("sequential_blue", ["#cde2fb", "#6da7ec", "#256abf", "#0d366b"])
 DIVERGING_BLUE_RED = LinearSegmentedColormap.from_list("diverging_blue_red", ["#2a78d6", "#f0efec", "#e34948"])
 DISTRIBUTION_COLOR = "#256abf"
 
 METHOD_LABELS = {"percent": "% change from baseline", "db": "dB change from baseline", "zscore": "baseline z-score"}
-
-
-def _grid_axes() -> tuple[list[float], list[float]]:
-    with open(os.path.join(FILES_DIR, "grid.json")) as f:
-        grid = json.load(f)
-    return grid["redArray"], grid["greenArray"]
 
 
 def _default_cmap(diverging: bool) -> Colormap:
@@ -84,7 +74,7 @@ def _plot_heatmap(ax: plt.Axes, grid: np.ndarray, *, cmap: Colormap, vmin: float
     """grid is indexed [red_idx, green_idx]; the pixel data is plotted exactly
     as-is (no transpose) -- only the axis labels/ticks are red-on-x, green-on-y."""
     im = ax.imshow(grid, origin="lower", cmap=cmap, vmin=vmin, vmax=vmax, aspect="auto")
-    red_vals, green_vals = _grid_axes()
+    red_vals, green_vals = load_grid_axes()
     ax.set_xticks(range(len(red_vals)))
     ax.set_xticklabels([f"{v:.0f}" for v in red_vals], rotation=45, ha="right")
     ax.set_xlabel("red")
@@ -318,7 +308,7 @@ def plot_interpolated_grid(
     n_red, n_green = shape
     interp = interpolate_grid(grid, (n_green, n_red), method=method)
     vmin, vmax = clim if clim is not None else _auto_clim([interp], diverging=diverging)
-    red_vals, green_vals = _grid_axes()
+    red_vals, green_vals = load_grid_axes()
 
     if ax is None:
         _, ax = plt.subplots()
@@ -567,4 +557,29 @@ def plot_groups_mean_boxplot(
     _, ax = plt.subplots()
     _boxplot(ax, data, labels, ylabel=_label_for(normalize))
     ax.set_title(f"session {session} -- groups mean-grid pixels")
+    return ax
+
+
+MARKER_SHAPES = ["o", "s", "^", "D", "v", "P", "X"]
+
+
+def plot_trough_scatter(troughs_df: pd.DataFrame, label_col: str, *, ax: plt.Axes | None = None) -> plt.Axes:
+    """Scatter of trough (red, green) locations from a subject_troughs.csv or
+    group_troughs.csv table (analysis.subject_troughs/group_troughs), one
+    marker shape per distinct label_col value ('group' or 'label'). Shape,
+    not color, carries category identity here -- at 4+ categories a scatter's
+    all-pairs color comparisons exceed the categorical palette's CVD-safe cap
+    (see the dataviz skill's palette notes), so shape sidesteps that entirely."""
+    if ax is None:
+        _, ax = plt.subplots()
+    for shape, label in zip(MARKER_SHAPES, sorted(troughs_df[label_col].unique())):
+        sub = troughs_df[troughs_df[label_col] == label]
+        ax.scatter(sub["red"], sub["green"], marker=shape, s=80, alpha=0.7, facecolor=DISTRIBUTION_COLOR, edgecolor="black", label=label)
+    red_vals, green_vals = load_grid_axes()
+    ax.set_xlim(min(red_vals), max(red_vals))
+    ax.set_ylim(min(green_vals), max(green_vals))
+    ax.set_xlabel("red")
+    ax.set_ylabel("green")
+    ax.legend(title=label_col)
+    ax.set_title("trough locations")
     return ax
