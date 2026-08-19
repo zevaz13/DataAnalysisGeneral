@@ -14,6 +14,7 @@ import pandas as pd
 from matplotlib.colors import Colormap, LinearSegmentedColormap
 
 from analysis import (
+    DEFAULT_NORMALIZE,
     flatten_runs,
     interpolate_grid,
     load_grid_axes,
@@ -24,6 +25,7 @@ from analysis import (
     raw_grid,
     subjects_in_group,
 )
+from reliability import session_pair_values
 
 MAX_PANEL_COLS = 5
 
@@ -660,3 +662,98 @@ def plot_permutation_null_histogram(null_values: np.ndarray, threshold: float, *
     ax.set_ylabel("count (permutations)")
     ax.legend()
     return ax
+
+
+def plot_trough_locations(
+    grid: np.ndarray, locations: dict[str, dict], *, cmap: Colormap | str | None = None, clim: tuple[float, float] | None = None, ax: plt.Axes | None = None
+) -> plt.Axes:
+    """Heatmap of grid with one marker per named location (each a dict with
+    'red'/'green' keys, e.g. from analysis.trough_location or
+    fit_trough_surface) -- for visually comparing trough-finding methods.
+    Locations are converted from physical red/green values to the heatmap's
+    pixel-index axes via interpolation, so a parametric fit's continuous,
+    off-grid location overlays correctly alongside the grid argmin's
+    on-grid one. Entries with a NaN location (failed fit) are skipped."""
+    if ax is None:
+        _, ax = plt.subplots()
+    vmin, vmax = clim if clim is not None else _auto_clim([grid], diverging=True)
+    _plot_heatmap(ax, grid, cmap=cmap or DIVERGING_BLUE_RED, vmin=vmin, vmax=vmax, label="value")
+
+    red_vals, green_vals = load_grid_axes()
+    for shape, (label, loc) in zip(MARKER_SHAPES, locations.items()):
+        if np.isnan(loc["red"]) or np.isnan(loc["green"]):
+            continue
+        red_pos = np.interp(loc["red"], red_vals, range(len(red_vals)))
+        green_pos = np.interp(loc["green"], green_vals, range(len(green_vals)))
+        ax.scatter([red_pos], [green_pos], marker=shape, s=150, facecolor="white", edgecolor="black", linewidth=1.5, label=label)
+    ax.legend()
+    return ax
+
+
+def plot_icc_map(icc: np.ndarray, *, title: str | None = None, cmap: Colormap | str | None = None, ax: plt.Axes | None = None) -> plt.Axes:
+    """Heatmap of a [red_idx, green_idx] ICC map (reliability.icc_map), fixed
+    to the [0, 1] ICC scale -- sequential (magnitude, unsigned), like the raw
+    heatmaps. Title defaults to the mean/median ICC across the map, matching
+    the template's own summary."""
+    if ax is None:
+        _, ax = plt.subplots()
+    _plot_heatmap(ax, icc, cmap=cmap or SEQUENTIAL_BLUE, vmin=0.0, vmax=1.0, label="ICC")
+    ax.set_title(title or f"mean ICC = {icc.mean():.2f}, median = {np.median(icc):.2f}")
+    return ax
+
+
+def plot_bland_altman(values1: np.ndarray, values2: np.ndarray, *, ax: plt.Axes | None = None) -> plt.Axes:
+    """Bland-Altman plot: mean of the two measurements (x) vs. their
+    difference (y), with the mean difference (bias) and +/-1.96 SD limits of
+    agreement marked."""
+    if ax is None:
+        _, ax = plt.subplots()
+    mean, diff = (values1 + values2) / 2, values1 - values2
+    bias, sd = diff.mean(), diff.std()
+    ax.scatter(mean, diff, color=DISTRIBUTION_COLOR, alpha=0.7, edgecolor="white")
+    ax.axhline(bias, color="black", linewidth=1, label=f"bias = {bias:.2f}")
+    ax.axhline(bias + 1.96 * sd, color="black", linestyle="--", linewidth=1, label=f"+/-1.96 SD = {1.96 * sd:.2f}")
+    ax.axhline(bias - 1.96 * sd, color="black", linestyle="--", linewidth=1)
+    ax.set_xlabel("mean of session 1, session 2")
+    ax.set_ylabel("session 1 - session 2")
+    ax.legend(fontsize=8)
+    return ax
+
+
+def plot_session_scatter(values1: np.ndarray, values2: np.ndarray, *, ax: plt.Axes | None = None) -> plt.Axes:
+    """Session 1 vs. session 2 scatter, with the y=x identity line for reference."""
+    if ax is None:
+        _, ax = plt.subplots()
+    ax.scatter(values1, values2, color=DISTRIBUTION_COLOR, alpha=0.7, edgecolor="white")
+    lo, hi = min(values1.min(), values2.min()), max(values1.max(), values2.max())
+    ax.plot([lo, hi], [lo, hi], color="black", linestyle="--", linewidth=1)
+    ax.set_xlabel("session 1")
+    ax.set_ylabel("session 2")
+    return ax
+
+
+def plot_example_points(
+    runmap_df: pd.DataFrame,
+    baselines_df: pd.DataFrame,
+    sub_ids: list[str],
+    points: list[dict],
+    *,
+    kind: str = "bland_altman",
+    normalize: dict | None = DEFAULT_NORMALIZE,
+    title: str | None = None,
+) -> plt.Figure:
+    """One panel per point in points (each a {"label", "red_idx", "green_idx"}
+    dict, e.g. from reliability.example_points_fixed/example_points_informative):
+    a Bland-Altman (kind='bland_altman') or session1-vs-session2 scatter
+    (kind='scatter') of the paired session values across sub_ids at that
+    grid cell."""
+    plot_fn = {"bland_altman": plot_bland_altman, "scatter": plot_session_scatter}[kind]
+    fig, axes = _multi_panel_figure(len(points))
+    for ax, point in zip(axes, points):
+        values1, values2 = session_pair_values(runmap_df, baselines_df, sub_ids, point["red_idx"], point["green_idx"], normalize=normalize)
+        plot_fn(values1, values2, ax=ax)
+        ax.set_title(f"{point['label']} (red_idx={point['red_idx']}, green_idx={point['green_idx']})")
+    if title:
+        fig.suptitle(title)
+    fig.tight_layout()
+    return fig

@@ -1,6 +1,6 @@
 # SSVEP grid analysis: conventions
 
-Established during M1-M3 of the SSVEP project (`ssveps/`). These are the
+Established during M1-M5 of the SSVEP project (`ssveps/`). These are the
 non-obvious decisions and conventions that are easy to get wrong if
 re-derived from scratch -- see `PLANssveps.md` for the full history and
 reasoning behind each.
@@ -62,14 +62,63 @@ non-interpolated plot exactly (max abs diff 0.0).
 
 `analysis.trough_location`/`subject_troughs`/`group_troughs` locate each
 subject's/group's minimum on the native 10x10 grid (argmin, no
-interpolation -- a proper noise-resistant localization via a parametric
-surface fit is planned for M4, so interpolating now would be a throwaway
-half-measure). Depth defaults to **% change from baseline**
+interpolation). Depth defaults to **% change from baseline**
 (`analysis.DEFAULT_NORMALIZE`), not raw value, because raw SSVEP
 amplitude varies a lot subject-to-subject and isn't comparable across
 subjects/groups -- pass `normalize=None` for raw depth instead.
-`DEFAULT_NORMALIZE` is the same constant `permutation.py`'s functions default
-to, for the same reason.
+`DEFAULT_NORMALIZE` is the same constant `permutation.py`'s and
+`reliability.py`'s functions default to, for the same reason.
+
+## Parametric trough surface fit (M4)
+
+Grid argmin can only ever land on one of the 100 sampled points, and
+individual subjects are noisy. `analysis.fit_trough_surface(grid, red_vals,
+green_vals, method=)` fits a continuous surface to a grid and locates *that*
+surface's own minimum instead (which can fall between grid points):
+
+- `method='paraboloid'` (default) -- `z = a x^2 + b y^2 + c xy + d x + e y +
+  f` via linear least squares (closed-form, no initial guess). More
+  numerically stable given the trough's already-established broad, flat
+  shape (M1).
+- `method='gaussian'` -- an inverted 2D Gaussian dip via nonlinear least
+  squares (`scipy.optimize.curve_fit`), seeded from the grid argmin. More
+  flexible for a sharply localized trough, but can fail to converge.
+
+Both report `fit_valid` (paraboloid: the Hessian must be positive-definite,
+i.e. a genuine minimum, not a saddle; gaussian: the fitted amplitude must be
+positive; both: the fitted location must fall inside the sampled red/green
+range, not extrapolated) and `r_squared`. **The fitted minimum's *value* is
+often notably higher than the observed grid's minimum pixel** -- expected,
+not a bug: a smooth surface's best-fit vertex doesn't need to coincide with
+the single noisiest/most extreme sampled point, especially for a trough
+that's broad and flat rather than a sharp bowl. `subject_troughs(...,
+surface_method=)` adds this fit's columns (`fitted_red`/`fitted_green`/
+`fitted_depth`/`fitted_r_squared`/`fitted_valid`) alongside the existing
+argmin ones in the same table.
+
+## Test-retest reliability via per-pixel ICC (M5)
+
+`reliability.py` replicates `ssveps/templateCode/ICCs/computeICC_gridMaps.m`
+-- for subjects with both sessions (`paired_subjects`, checked at session 1
+by default), compute each subject's session 1 and session 2 mean grids, then
+for every one of the 100 grid cells compute the intraclass correlation
+coefficient between the two sessions across subjects (`icc_grid`/`icc_map`)
+-- an "ICC map" of which pixels are more or less reliable test-retest.
+
+Python ICC: [`pingouin`](https://pingouin-stats.org/)'s `intraclass_corr`.
+Its `'ICC(A,1)'` row (two-way random, absolute agreement, single
+measurement -- McGraw & Wong 1996 notation) is exactly the template's MATLAB
+`ICC(..., 'A-1')`, including matching CI/F/p columns.
+
+**The CVD/protan/deutan test-retest sample is currently too thin to use.**
+Of the 19 subjects with both sessions, only 2 are protan and 0 are deutan
+(so `group='CVD'` combined is n=2) -- `pingouin`'s underlying ANOVA needs at
+least 3 subjects, and `icc_grid` raises a clear `ValueError` rather than
+silently running on too little data. Only `group='PD'` (n=4), `group='CTR'`
+(n=13), and the unfiltered full paired set (n=19) currently have enough
+paired subjects for a reliability analysis. This will change if/when more
+session-2 data for the CVD subgroups is collected -- no code change would be
+needed, just enough subjects for the existing `ValueError` to stop firing.
 
 ## Cluster-based permutation testing (M3)
 

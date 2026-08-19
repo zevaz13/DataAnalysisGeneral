@@ -9,6 +9,7 @@ import os
 import numpy as np
 import pandas as pd
 from scipy.interpolate import RegularGridInterpolator
+from scipy.optimize import curve_fit
 
 FILES_DIR = os.path.join(os.path.dirname(__file__), "..", "files")
 
@@ -208,22 +209,118 @@ def trough_location(grid: np.ndarray, red_vals: list[float], green_vals: list[fl
     }
 
 
+def fit_paraboloid(grid: np.ndarray, red_vals: list[float], green_vals: list[float]) -> dict:
+    """Fit z = a*x^2 + b*y^2 + c*x*y + d*x + e*y + f to the grid via linear
+    least squares (closed-form, no initial guess needed), then locate the
+    fitted surface's own minimum analytically (solving the gradient = 0),
+    which need not land on a grid point -- a noise-robust alternative to
+    trough_location's argmin on the coarse 10x10 grid.
+
+    fit_valid is False if the critical point isn't a genuine minimum (the
+    Hessian isn't positive-definite -- the fit found a saddle or a maximum
+    instead) or falls outside the sampled red/green range (extrapolation);
+    depth/red/green are still returned in that case for inspection, but
+    shouldn't be treated as a real trough location."""
+    x, y = np.meshgrid(red_vals, green_vals, indexing="ij")
+    x, y, z = x.ravel(), y.ravel(), grid.ravel()
+    design = np.column_stack([x**2, y**2, x * y, x, y, np.ones_like(x)])
+    (a, b, c, d, e, f), *_ = np.linalg.lstsq(design, z, rcond=None)
+
+    hessian = np.array([[2 * a, c], [c, 2 * b]])
+    is_minimum = bool(np.all(np.linalg.eigvalsh(hessian) > 0))
+    if is_minimum:
+        x_min, y_min = np.linalg.solve(hessian, [-d, -e])
+    else:
+        x_min, y_min = np.nan, np.nan
+    depth = a * x_min**2 + b * y_min**2 + c * x_min * y_min + d * x_min + e * y_min + f
+
+    z_pred = design @ [a, b, c, d, e, f]
+    r_squared = 1 - np.sum((z - z_pred) ** 2) / np.sum((z - z.mean()) ** 2)
+    in_bounds = min(red_vals) <= x_min <= max(red_vals) and min(green_vals) <= y_min <= max(green_vals)
+
+    return {
+        "red": x_min,
+        "green": y_min,
+        "depth": depth,
+        "r_squared": r_squared,
+        "fit_valid": is_minimum and in_bounds,
+    }
+
+
+def fit_gaussian(grid: np.ndarray, red_vals: list[float], green_vals: list[float]) -> dict:
+    """Fit an inverted 2D Gaussian dip z = f0 - amp*exp(-((x-x0)^2/(2*sx^2) +
+    (y-y0)^2/(2*sy^2))) via nonlinear least squares (scipy.optimize.curve_fit),
+    initialized from trough_location's grid argmin. More flexible than
+    fit_paraboloid for a sharply localized trough, but can fail to converge
+    on flat/noisy data -- fit_valid is False if curve_fit doesn't converge,
+    if the fitted amplitude isn't positive (not actually a dip), or if the
+    fitted center falls outside the sampled red/green range."""
+    x, y = np.meshgrid(red_vals, green_vals, indexing="ij")
+    x, y, z = x.ravel(), y.ravel(), grid.ravel()
+
+    def model(xy, f0, amp, x0, y0, sx, sy):
+        xx, yy = xy
+        return f0 - amp * np.exp(-(((xx - x0) ** 2) / (2 * sx**2) + ((yy - y0) ** 2) / (2 * sy**2)))
+
+    seed = trough_location(grid, red_vals, green_vals)
+    p0 = [z.mean(), z.mean() - seed["depth"], seed["red"], seed["green"], (max(red_vals) - min(red_vals)) / 4, (max(green_vals) - min(green_vals)) / 4]
+    try:
+        (f0, amp, x0, y0, sx, sy), _ = curve_fit(model, (x, y), z, p0=p0, maxfev=5000)
+    except RuntimeError:
+        return {"red": np.nan, "green": np.nan, "depth": np.nan, "r_squared": np.nan, "fit_valid": False}
+
+    depth = f0 - amp
+    z_pred = model((x, y), f0, amp, x0, y0, sx, sy)
+    r_squared = 1 - np.sum((z - z_pred) ** 2) / np.sum((z - z.mean()) ** 2)
+    in_bounds = min(red_vals) <= x0 <= max(red_vals) and min(green_vals) <= y0 <= max(green_vals)
+
+    return {"red": x0, "green": y0, "depth": depth, "r_squared": r_squared, "fit_valid": bool(amp > 0 and in_bounds)}
+
+
+def fit_trough_surface(grid: np.ndarray, red_vals: list[float], green_vals: list[float], *, method: str = "paraboloid") -> dict:
+    """fit_paraboloid or fit_gaussian, selected by method."""
+    if method == "paraboloid":
+        return fit_paraboloid(grid, red_vals, green_vals)
+    if method == "gaussian":
+        return fit_gaussian(grid, red_vals, green_vals)
+    raise ValueError(f"unknown method: {method}")
+
+
 def subject_troughs(
     runmap_df: pd.DataFrame,
     baselines_df: pd.DataFrame,
     metadata_df: pd.DataFrame,
     *,
     normalize: dict | None = DEFAULT_NORMALIZE,
+    surface_method: str = "paraboloid",
 ) -> pd.DataFrame:
     """One row per (sub_id, session) in metadata_df: the minimum location and
-    depth of that subject's mean-across-runs grid. normalize=None for raw
-    depth, otherwise a scope/trials/method dict as elsewhere."""
+    depth of that subject's mean-across-runs grid, both from the raw grid
+    argmin (red/green/depth/red_idx/green_idx, trough_location) and from a
+    parametric surface fit (fitted_red/fitted_green/fitted_depth/
+    fitted_r_squared/fitted_valid, fit_trough_surface -- M4's noise-robust
+    alternative). normalize=None for raw depth, otherwise a scope/trials/
+    method dict as elsewhere."""
     red_vals, green_vals = load_grid_axes()
     rows = []
     for meta in metadata_df.to_dict("records"):
         grid = mean_grid(runmap_df, baselines_df, meta["sub_id"], meta["session"], normalize=normalize)
         loc = trough_location(grid, red_vals, green_vals)
-        rows.append({"sub_id": meta["sub_id"], "session": meta["session"], "group": meta["group"], "subgroup": meta["subgroup"], **loc})
+        fit = fit_trough_surface(grid, red_vals, green_vals, method=surface_method)
+        rows.append(
+            {
+                "sub_id": meta["sub_id"],
+                "session": meta["session"],
+                "group": meta["group"],
+                "subgroup": meta["subgroup"],
+                **loc,
+                "fitted_red": fit["red"],
+                "fitted_green": fit["green"],
+                "fitted_depth": fit["depth"],
+                "fitted_r_squared": fit["r_squared"],
+                "fitted_valid": fit["fit_valid"],
+            }
+        )
     return pd.DataFrame(rows)
 
 
