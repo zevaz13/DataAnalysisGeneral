@@ -392,6 +392,21 @@ at specific pixels).
   df1, df2, pval` -- per-pixel `ICC(A,1)` (pingouin) between session 1 and
   session 2 mean grids across `sub_ids` (each must be in both sessions --
   pass the output of `paired_subjects`, not an arbitrary list).
+- **`feature_icc(values1, values2) -> dict`** (M9)
+  `{icc, ci_lower, ci_upper, f, df1, df2, pval}` -- the same `ICC(A,1)`
+  computation as `icc_grid`, but for one per-subject scalar feature (e.g.
+  `subject_troughs.csv`'s `depth`, `ramp_slope_red`, or a hand-computed `gain`
+  series) instead of one grid cell. `values1`/`values2` must be in the same
+  subject order; needs >=3 paired subjects, same as `icc_grid`. See
+  `11_reliability_outcomes.ipynb`.
+- **`minimum_detectable_effect(n1, n2, *, icc=1.0, alpha=0.05, power=0.8) -> float`** (M9)
+  The smallest true (population) Cohen's d a two-sample comparison with
+  `n1`/`n2` subjects per group can detect at `power`, on a measure with
+  test-retest reliability `icc`. `icc=1.0` (default) is the textbook
+  noiseless-measure formula; a lower `icc` divides the result by `sqrt(icc)`
+  (classical test theory's attenuation correction), so an unreliable feature
+  needs a bigger true effect to ever be detectable at a given n -- see
+  `11_reliability_outcomes.ipynb`'s synthetic walkthrough for why.
 
   **How to use this differently:** *raw instead of normalized* --
   `normalize=None`. Takes a few seconds per call (one `pingouin` ANOVA per
@@ -477,6 +492,36 @@ worked analysis.
   subject's own run values, `ddof=1`) -- corrects for response magnitude
   scaling the raw within-subject SD, so groups with different average
   response sizes stay comparable on noise alone.
+
+## `pca.py` -- PCA of the response grid (M10)
+
+Treats each subject's 10x10 grid as one 100-dimensional observation instead
+of collapsing it to a single number or running 100 cell-wise tests. See
+`docs/ssvep_analyses.md` proposal 7 and `12_pca.ipynb` for the full worked
+analysis.
+
+- **`pixel_matrix(runmap_df, baselines_df, metadata_df, session, *, normalize=DEFAULT_NORMALIZE) -> (DataFrame, ndarray)`**
+  Every subject's mean grid at `session`, flattened and stacked into an
+  `(n_subjects, 100)` matrix -- the input every function below takes.
+  Returns `(metadata rows in matrix row order, matrix)`; row `i` of the
+  metadata frame describes row `i` of the matrix.
+- **`fit_pca(X) -> dict`**
+  `{mean, components, scores, explained_variance, explained_variance_ratio}`
+  -- ordinary PCA via SVD on mean-centered `X`, no covariance shrinkage.
+  `components[k]` is the k-th principal axis (reshape to `(10, 10)` to view
+  as a grid); `scores[:, k]` is every subject's projection onto it. Component
+  sign is an SVD convention, not a data property.
+- **`permutation_component_count(X, *, n_perm=2000, alpha=0.05, seed=0) -> dict`**
+  `{observed_ratio, null_ratio_threshold, n_components_real}` -- how many
+  components carry more structure than chance, via a numpy-native version of
+  Horn's (1965) parallel analysis: permute each column (grid cell)
+  independently across subjects (destroys cross-cell correlation, keeps each
+  cell's own marginal distribution), redo PCA, repeat `n_perm` times to build
+  a null explained-variance-ratio spectrum, and count the leading run of
+  components whose observed ratio clears its own rank's `(1-alpha)` null
+  percentile. This project's regularization-free alternative to a fixed
+  component cutoff or a shrinkage-covariance estimate (see `docs/methods.md`
+  for why).
 
 ## Build scripts
 
@@ -587,3 +632,27 @@ edit the variables called out below and rerun from that cell down.
   `ramp_slope_red` finding that protan's trough sits furthest beyond the
   sampled range. *Edit:* `SESSION` (top cell); swap `group='CTR'` in the
   `group_grid` call for a different reference template.
+- **`11_reliability_outcomes.ipynb`** -- M9, `docs/ssvep_analyses.md`
+  proposal 5: `reliability.feature_icc` for six candidate outcome features
+  (`depth`, `ramp_slope_red`, `gain` on all 19 paired subjects;
+  `fitted_green`/`fitted_amp`/`fitted_red` restricted to the 14 with a valid
+  `fit_ramp_gaussian` fit at both sessions), then
+  `reliability.minimum_detectable_effect` at this project's two actual
+  comparisons (PD vs CTR, protan vs deutan). Currently `gain` (ICC=0.90) and
+  `ramp_slope_red` (ICC=0.85) are *more* reliable than `depth` (ICC=0.76,
+  the previous primary-outcome recommendation); `fitted_red` (ICC=0.18)
+  needs a true effect over d=3 to ever be detectable at this project's n --
+  functionally unusable. *Edit:* the `features` list in the ICC cell to add
+  a new candidate; the two `n1, n2` pairs passed to
+  `minimum_detectable_effect` to check a different comparison.
+- **`12_pca.ipynb`** -- M10, `docs/ssvep_analyses.md` proposal 7:
+  `pca.pixel_matrix` + `pca.fit_pca` on all 43 session-1 grids, `pca.
+  permutation_component_count` to decide how many components to trust,
+  loading-map heatmaps for PC1-3, and a group comparison of PC1 scores.
+  Currently only PC1 (75% of variance) clears the permutation noise floor;
+  it correlates at r=-0.93 with M8's `gain` and M6's `ramp_intercept` --
+  the same gain axis found three independent ways. PC1 doesn't separate PD
+  from CTR (p=0.63) but comes closer than any single M6/M8 measure did on
+  protan vs. deutan (p=0.092, not significant, exploratory). *Edit:*
+  `SESSION` (top cell); `n_perm` on `permutation_component_count` to trade
+  precision for runtime.

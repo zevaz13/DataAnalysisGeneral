@@ -48,9 +48,10 @@ first axis is actually **green** and its second **red** (confirmed three ways
   `ramp_r_squared`, M6) that's defined for every row, unlike the `fitted_*`
   columns which can fail to locate an interior trough.
 
-M7's variance components and M8's gain/shape decomposition are not persisted
-to CSV -- both depend on a choice made at analysis time (which group's
-subjects to pool, which template to regress against) rather than being an
+M7's variance components, M8's gain/shape decomposition, and M10's PCA
+components are not persisted to CSV -- all three depend on a choice made at
+analysis time (which group's subjects to pool, which template to regress
+against, which session's grids go into the matrix) rather than being an
 intrinsic per-subject property, so they're computed fresh in their notebooks.
 
 ## Analysis
@@ -125,9 +126,21 @@ per comparison; pass `n1`/`n2` to reproduce that.
 
 `paired_subjects` (subjects with both sessions), `icc_grid`/`icc_map`
 (per-pixel ICC(A,1) via `pingouin`, matching the template's MATLAB `ICC('A-1')`;
-needs >=3 paired subjects), `session_pair_values`, and two example-point
-selectors — `example_points_fixed` (the template's 5 hardcoded targets) and
-`example_points_informative` (lowest-ICC / highest-ICC / trough pixels).
+needs >=3 paired subjects), `feature_icc` (the same ICC(A,1) computation for
+one per-subject scalar feature instead of a grid cell, M9),
+`minimum_detectable_effect` (the smallest true effect a two-sample comparison
+can detect at a given n and feature ICC, M9), `session_pair_values`, and two
+example-point selectors — `example_points_fixed` (the template's 5 hardcoded
+targets) and `example_points_informative` (lowest-ICC / highest-ICC / trough
+pixels).
+
+### `scripts/pca.py` — principal component analysis of the response grid (M10)
+
+`pixel_matrix` (every subject's mean grid at a session, flattened and
+stacked), `fit_pca` (PCA via SVD, no covariance shrinkage),
+`permutation_component_count` (how many components are distinguishable from
+a shuffled-column null -- this project's regularization-free alternative to
+a fixed component cutoff or a shrinkage-covariance estimate).
 
 ### `scripts/plotting.py` — all figures
 
@@ -187,7 +200,12 @@ connectivity, permutation reproducibility, and the 5-column panel wrapping.
 ## Notebooks
 
 Each opens with `sys.path.append('../scripts')`, so run them with `notebooks/`
-as the working directory.
+as the working directory. `08`-`12` each include an "Understanding ..."
+section per method, with a synthetic-data walkthrough and plots before the
+real analysis -- read those first if the underlying statistics (bootstrap
+CIs, MixedLM variance components, gain/shape regression, ICC/minimum
+detectable effect, PCA/permutation component selection) aren't already
+familiar.
 
 - `01_explore.ipynb` — load and look at `MET000.mat`
 - `02_plots.ipynb` — raw and baseline-normalized heatmaps (single run, all runs,
@@ -214,3 +232,8 @@ as the working directory.
   just response-size scaling
 - `10_gain_shape.ipynb` — M8: per-subject gain vs. shape decomposition
   against the CTR template, and a cross-check against M6's ramp measures
+- `11_reliability_outcomes.ipynb` — M9: test-retest ICC for six candidate
+  outcome features and the minimum detectable effect each supports at this
+  project's actual sample sizes -- updates the primary-outcome recommendation
+- `12_pca.ipynb` — M10: PCA of the 100-cell grids with permutation-based
+  component selection, loading maps, and a group comparison of PC1

@@ -270,6 +270,91 @@ external location). They can disagree completely for a subject whose own
 trough is nowhere near the template's, which is exactly the case
 `trough_region_residual` exists to handle.
 
+## Reliability-first outcome selection (M9)
+
+`reliability.feature_icc` extends the per-pixel `ICC(A,1)` machinery (M5) to
+per-subject scalar features: same computation (`_icc_a1`, shared with
+`icc_grid`), applied to a candidate outcome measure's session-1/session-2
+values instead of one grid cell's. Three features are defined for every
+paired subject regardless of fit quality (`depth`, M6's `ramp_slope_red`, M8's
+`gain`); three depend on `fit_ramp_gaussian` locating an actual dip
+(`fitted_green`/`fitted_amp`/`fitted_red`) and are restricted to the subjects
+where that fit was `fitted_valid` at both sessions -- 14 of the 19 paired
+subjects, matching how `docs/ssvep_analyses.md` proposal 5 originally
+computed these three (confirmed: this project's ICC on that same 14-subject
+filter reproduces the document's plain-Pearson-correlation numbers closely,
+e.g. `fitted_red` 0.18 ICC vs. the document's r=0.17).
+
+**Primary outcome measure, updated (2026-08-20).** `depth` (ICC=0.76) was the
+best of the original four candidates and the previous recommendation. Since
+then, M6's `ramp_slope_red` (ICC=0.85) and M8's `gain` (ICC=0.90) turned out
+to be *more* reliable, not just comparably reliable -- both are now the
+recommended primary outcome for anything involving the CVD/subtype
+comparisons M6-M8 are about, since they were purpose-built for exactly that
+question. `depth` remains a fine choice outside that context, or for
+continuity with the argmin-based MATLAB templates. `fitted_red` (ICC=0.18)
+should not be used as a primary outcome in any comparison -- see the minimum
+detectable effect argument below for why that's not just "somewhat worse."
+
+**Minimum detectable effect.** `reliability.minimum_detectable_effect(n1, n2,
+icc=)` connects a feature's ICC directly to this project's actual power,
+via classical test theory's attenuation result: unreliable measurement
+shrinks an observed effect size relative to the true one by a factor of
+`sqrt(icc)` (`d_observed = d_true * sqrt(icc)`, because ICC =
+var(true)/var(observed) implies SD_observed = SD_true/sqrt(icc), and the raw
+mean difference is unaffected by measurement noise on average). Dividing the
+standard two-sample-t-test minimum detectable *observed* effect by
+`sqrt(icc)` gives the smallest *true* effect that could still survive that
+much attenuation: `d_true = d_observed / sqrt(icc)`. At this project's
+PD-vs-CTR sample size (n=6, 21), `fitted_red`'s ICC pushes the minimum
+detectable true effect past d=3 -- larger than the largest effect size seen
+anywhere in this dataset so far (proposal 1's PD-vs-CTR trough-depth effect,
+d=0.45). That's what makes `fitted_red` unusable, not just "less good."
+
+## PCA of the response grid, with permutation-based component selection (M10)
+
+`pca.py` treats each subject's 10x10 grid as one 100-dimensional
+observation and runs ordinary PCA via SVD (`pca.fit_pca`) -- no covariance
+shrinkage or other regularized-covariance estimator.
+
+**Why permutation-based component selection instead of literal covariance
+regularization.** `docs/ssvep_analyses.md` proposal 7 flagged that PCA at
+n=43 subjects vs. 100 features "needs regularisation." The literal reading
+(shrinkage-regularized covariance, e.g. Ledoit-Wolf) would add a new
+dependency (`sklearn.covariance`) and a technique with no other precedent in
+this codebase. Decided against it (2026-08-20) in favor of
+`pca.permutation_component_count`: permute each grid cell independently
+across subjects (destroys cross-cell correlation, keeps each cell's own
+marginal distribution), redo PCA, repeat many times to build a null
+explained-variance-ratio spectrum per component rank, and only trust
+components whose observed ratio beats their own rank's null. This is a
+numpy-native technique (Horn's 1965 parallel analysis) that reuses the same
+permutation-testing idea `permutation.py` (M3) and the bootstrap CIs (M6,
+M7) already use elsewhere in this project, rather than introducing a new
+paradigm for one milestone.
+
+**Real-data finding.** PC1 alone explains 75% of the variance and is the
+only component that clears the permutation noise floor -- stricter than
+proposal 7's own expectation of "two or three" trustworthy components (PC2's
+observed ratio, 5.4%, sits just below its rank's null threshold, 6.1%). This
+doesn't mean PC2/PC3 carry zero signal, just that they aren't statistically
+distinguishable from what 100 correlated-but-otherwise-unstructured cells
+would produce by chance at n=43.
+
+**PC1 is the gain axis, found a third independent way.** PC1's loading is
+uniform in sign across almost the whole grid (a flat, whole-surface pattern,
+not something localized near the trough), and its scores correlate at r=-0.93
+with M8's `gain` and equally strongly with M6's `ramp_intercept` -- three
+completely independent derivations (unsupervised PCA with no group labels or
+template; a template regression; a ramp fit's intercept) converging on the
+same axis. Good evidence "gain" is the dominant real axis of variation in
+this dataset, not an artifact of one fitting choice. PC1 doesn't separate PD
+from CTR (p=0.63, same underpowered story as everywhere else for PD), but
+comes closer to separating protan from deutan (p=0.092) than any single
+M6/M8 measure did -- consistent with proposal 7's claim that combining all
+100 cells into one component improves SNR over any individual derived
+measure, though "closer" is not "significant."
+
 ## Cluster-based permutation testing (M3)
 
 `permutation.py` replicates `ssveps/templateCode/permTestingcomparisons/*.m`

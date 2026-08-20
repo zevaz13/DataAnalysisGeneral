@@ -168,19 +168,66 @@ Carry this into `methods.md` when M6-M10 land.
     `fitted_amp` (M4/M6) r=0.04, p=0.79 -- genuinely don't agree, because
     they measure different things (template-centered vs. subject-centered);
     not a bug, written up as such in `docs/methods.md`.
-- [ ] **M9 - Proposal 5: reliability-first outcome selection.**
-  - [ ] Extend the `reliability.py` ICC machinery from per-pixel maps to the
-    per-subject features (`depth`, `fitted_green`, `fitted_amp`, `fitted_red`)
-    and report ICC with CIs for each.
-  - [ ] Compute the minimum detectable effect at actual n for each candidate
-    feature.
-  - [ ] Confirm `depth` (r=0.78 test-retest) as the primary outcome and
-    `fitted_red` as unreliable; record the decision in `methods.md`.
-- [ ] **M10 - Proposal 7: joint (PCA) treatment of the 100-cell grid.**
-  - [ ] PCA across subjects on the 100-cell vectors, regularized given
-    n=42 subjects vs. 100 features.
-  - [ ] Interpret the first few components (expected: gain, trough depth,
-    trough position as separate axes).
-  - [ ] Group-compare component scores instead of cell-wise tests.
-  - [ ] Treat this as preparation for a larger sample -- it improves SNR over
-    cell-wise testing but does not rescue power at n=6 for PD.
+- [x] **M9 - Proposal 5: reliability-first outcome selection.**
+  `11_reliability_outcomes.ipynb`. Extended (per your decision) to check
+  M6/M8's newer measures too, not just the original 4 -- and that changed
+  the answer.
+  - [x] `reliability.feature_icc` on 6 candidates: `depth` (ICC=0.76),
+    `ramp_slope_red` (0.85), `gain` (0.90) on all 19 paired subjects;
+    `fitted_green` (0.44)/`fitted_amp` (0.49)/`fitted_red` (0.18) on the 14
+    with a valid fit at both sessions (matching how the earlier document
+    computed these three -- confirmed by reproducing its `fitted_red`
+    r=0.17 as ICC=0.18 on the same subject filter).
+  - [x] `reliability.minimum_detectable_effect` at PD-vs-CTR (n=6,21) and
+    protan-vs-deutan (n=8,7): `fitted_red` needs a true effect over d=3 to
+    ever be detectable -- larger than the largest effect size anywhere in
+    this dataset (d=0.45) -- confirming it's unusable, not just "worse".
+  - [x] **Recommendation updated, not just confirmed:** `ramp_slope_red`
+    and `gain` are *more* reliable than `depth`, not merely comparable --
+    now the recommended primary outcome for CVD/subtype work specifically
+    (M6-M8's own question). `depth` remains fine elsewhere. `fitted_red`
+    should not be used as a primary outcome anywhere. Recorded in
+    `docs/methods.md`.
+- [x] **M10 - Proposal 7: joint (PCA) treatment of the 100-cell grid.**
+  `12_pca.ipynb`, `pca.py`. Regularization handled via permutation-based
+  component selection (your decision) rather than covariance shrinkage --
+  see `docs/methods.md` for the reasoning.
+  - [x] PCA (plain SVD, `pca.fit_pca`) on all 43 session-1 subjects.
+  - [x] `pca.permutation_component_count`: only **PC1** (75% of variance)
+    clears the shuffled-column noise floor -- stricter than the "two or
+    three" originally expected, an honest finding not a method failure.
+  - [x] Interpreted PC1 directly: uniform-sign loading (whole-surface, not
+    trough-localized) and r=-0.93/r=-0.93 with M8's `gain` and M6's
+    `ramp_intercept` -- the gain axis found a third, fully independent way.
+  - [x] Group-compared PC1: PD vs CTR not significant (p=0.63, same as
+    everywhere else for PD); protan vs deutan closer than any single M6/M8
+    measure (p=0.092, still not significant, exploratory).
+  - [x] Confirmed: doesn't rescue PD's power (nothing does at n=6) -- but
+    is now a validated, reusable "overall gain" summary, and PC2/PC3 are
+    flagged as leads worth revisiting once more session-2 CVD data narrows
+    the permutation test's noise floor.
+
+## M6-M10: where this leaves things
+
+All five proposed analyses are implemented (notebooks 08-12), tested, and
+documented. The picture that emerged, in one place:
+
+- **CVD vs. HC is solid** (M6, p=0.0019) and gain (`ramp_slope_red`/`gain`,
+  M6/M8/M10, three independent derivations of the same axis) is the
+  best-supported, most reliable measure in the whole project (M9).
+- **The protan/deutan subtype question has a consistent hint, not yet a
+  result:** shallower `ramp_slope_red` (M6), a trough-specific residual
+  (M8), and the closest-to-significant PC1 split (M10) all point the same
+  direction for protan, but none individually clears significance at n=7
+  vs. 8.
+- **PD's variability is about the people, not the measurement** (M7,
+  within-subject SD not elevated), but whether PD is *more* variable than
+  CTR remains unresolved either way at n=6 -- and deutan's between-subject
+  SD came out *lower* than CTR's, an unexpected finding worth tracking.
+- **The two standing experimental recommendations, unchanged since M6:**
+  extend the red stimulus axis (would directly address the subtype
+  question), and collect more PD/protan/deutan subjects (would directly
+  address every underpowered comparison above -- no analytical method
+  rescues power that isn't there).
+
+Next milestones to be defined together, informed by the above.

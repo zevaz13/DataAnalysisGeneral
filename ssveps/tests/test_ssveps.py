@@ -11,6 +11,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from scipy.stats import norm
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -19,6 +20,8 @@ import analysis  # noqa: E402
 import plotting  # noqa: E402
 import permutation  # noqa: E402
 import variance  # noqa: E402
+import reliability  # noqa: E402
+import pca  # noqa: E402
 from loader import load_ssvep, to_rows  # noqa: E402
 
 RAW_DIR = Path("/home/sebas/data/ssveps")
@@ -344,6 +347,104 @@ def test_group_run_values_matches_run_mean_values(data):
         np.testing.assert_array_equal(
             vals, analysis.run_mean_values(runmap, baselines, sub_id, 1, normalize=analysis.DEFAULT_NORMALIZE)
         )
+
+
+# --- feature reliability, minimum detectable effect (M9) --------------------
+
+
+def test_feature_icc_matches_icc_grid_on_the_same_pixel(data):
+    """feature_icc and icc_grid share _icc_a1 -- confirm the refactor didn't
+    change icc_grid's own numbers by checking they agree on one pixel."""
+    runmap, baselines, meta = data
+    sub_ids = reliability.paired_subjects(meta, group="CTR")
+    icc_df = reliability.icc_grid(runmap, baselines, sub_ids)
+    row = icc_df.iloc[0]
+    red_idx, green_idx = int(row["red_idx"]), int(row["green_idx"])
+    values1, values2 = reliability.session_pair_values(runmap, baselines, sub_ids, red_idx, green_idx)
+    result = reliability.feature_icc(values1, values2)
+    assert result["icc"] == pytest.approx(row["icc"])
+    assert result["pval"] == pytest.approx(row["pval"])
+
+
+def test_feature_icc_is_high_for_a_near_identical_repeat():
+    rng = np.random.default_rng(0)
+    truth = rng.normal(0, 1, size=20)
+    values1 = truth + rng.normal(0, 0.01, size=20)
+    values2 = truth + rng.normal(0, 0.01, size=20)
+    result = reliability.feature_icc(values1, values2)
+    assert result["icc"] > 0.99
+
+
+def test_feature_icc_is_low_for_independent_noise():
+    rng = np.random.default_rng(1)
+    values1 = rng.normal(0, 1, size=30)
+    values2 = rng.normal(0, 1, size=30)
+    result = reliability.feature_icc(values1, values2)
+    assert result["icc"] < 0.3
+
+
+def test_minimum_detectable_effect_worsens_as_reliability_drops():
+    """A noisier measure (lower ICC) needs a bigger true effect to detect at
+    the same n and power -- MDE should increase monotonically as ICC falls."""
+    mde_perfect = reliability.minimum_detectable_effect(10, 10, icc=1.0)
+    mde_half = reliability.minimum_detectable_effect(10, 10, icc=0.5)
+    mde_low = reliability.minimum_detectable_effect(10, 10, icc=0.1)
+    assert mde_perfect < mde_half < mde_low
+    # icc=1.0 is exactly the textbook two-sample MDE formula, no attenuation.
+    assert mde_perfect == pytest.approx((norm.ppf(0.975) + norm.ppf(0.8)) * np.sqrt(1 / 10 + 1 / 10))
+
+
+def test_minimum_detectable_effect_shrinks_with_more_subjects():
+    mde_small_n = reliability.minimum_detectable_effect(6, 6, icc=0.7)
+    mde_large_n = reliability.minimum_detectable_effect(30, 30, icc=0.7)
+    assert mde_large_n < mde_small_n
+
+
+# --- PCA (M10) ---------------------------------------------------------------
+
+
+def test_fit_pca_recovers_a_known_low_rank_structure():
+    """Data built from one strong direction plus tiny noise -- PC1 should
+    capture almost all the variance and its scores should recover the
+    generating signal (up to sign, which SVD leaves arbitrary)."""
+    rng = np.random.default_rng(0)
+    n_subjects, n_features = 40, 100
+    direction = rng.normal(size=n_features)
+    direction /= np.linalg.norm(direction)
+    signal = rng.normal(0, 5, size=n_subjects)
+    X = np.outer(signal, direction) + rng.normal(0, 0.05, size=(n_subjects, n_features))
+
+    result = pca.fit_pca(X)
+    assert result["explained_variance_ratio"][0] > 0.95
+    correlation = abs(np.corrcoef(result["scores"][:, 0], signal)[0, 1])
+    assert correlation > 0.99
+
+
+def test_permutation_component_count_finds_nothing_in_pure_noise():
+    rng = np.random.default_rng(1)
+    X = rng.normal(size=(40, 100))
+    result = pca.permutation_component_count(X, n_perm=200, seed=0)
+    assert result["n_components_real"] == 0
+
+
+def test_permutation_component_count_finds_an_injected_signal():
+    rng = np.random.default_rng(2)
+    n_subjects, n_features = 40, 100
+    direction = rng.normal(size=n_features)
+    direction /= np.linalg.norm(direction)
+    signal = rng.normal(0, 8, size=n_subjects)
+    X = np.outer(signal, direction) + rng.normal(0, 1, size=(n_subjects, n_features))
+    result = pca.permutation_component_count(X, n_perm=200, seed=0)
+    assert result["n_components_real"] >= 1
+
+
+def test_pixel_matrix_matches_mean_grid(data):
+    runmap, baselines, meta = data
+    meta_out, X = pca.pixel_matrix(runmap, baselines, meta, 1)
+    assert X.shape == (len(meta_out), 100)
+    row = meta_out.iloc[0]
+    expected = analysis.mean_grid(runmap, baselines, row["sub_id"], 1, normalize=analysis.DEFAULT_NORMALIZE).ravel()
+    np.testing.assert_allclose(X[0], expected)
 
 
 # --- figure layout ---------------------------------------------------------
