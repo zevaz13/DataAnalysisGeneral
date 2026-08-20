@@ -447,6 +447,7 @@ dependencies = [
     { name = "polars" },
     { name = "requests" },
     { name = "scipy" },
+    { name = "statsmodels" },
 ]
 
 [package.dev-dependencies]
@@ -466,6 +467,7 @@ requires-dist = [
     { name = "polars", specifier = ">=1.43.2" },
     { name = "requests", specifier = ">=2.34.2" },
     { name = "scipy", specifier = ">=1.18.0" },
+    { name = "statsmodels", specifier = ">=0.14.6" },
 ]
 
 [package.metadata.requires-dev]

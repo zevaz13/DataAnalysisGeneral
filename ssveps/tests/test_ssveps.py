@@ -18,6 +18,7 @@ sys.path.insert(0, str(SCRIPTS))
 import analysis  # noqa: E402
 import plotting  # noqa: E402
 import permutation  # noqa: E402
+import variance  # noqa: E402
 from loader import load_ssvep, to_rows  # noqa: E402
 
 RAW_DIR = Path("/home/sebas/data/ssveps")
@@ -266,6 +267,83 @@ def test_permutation_is_reproducible_under_a_seed(data):
     a = permutation.permutation_test_size(runmap, baselines, meta, 1, **kw)
     b = permutation.permutation_test_size(runmap, baselines, meta, 1, **kw)
     np.testing.assert_array_equal(a["zdiff"], b["zdiff"])
+
+
+# --- gain/shape decomposition (M8) ------------------------------------------
+
+
+def test_fit_gain_shape_recovers_a_known_gain():
+    template = np.array([[1.0, 2.0], [3.0, 4.0]])
+    grid = 0.5 * template + 0.1  # pure gain change, no shape change
+    fit = analysis.fit_gain_shape(grid, template)
+    assert fit["gain"] == pytest.approx(0.5, abs=1e-9)
+    assert fit["intercept"] == pytest.approx(0.1, abs=1e-9)
+    assert fit["r_squared"] > 0.999
+    np.testing.assert_allclose(fit["residual"], 0.0, atol=1e-9)
+
+
+def test_fit_gain_shape_isolates_a_localized_shape_change():
+    template = np.ones((10, 10))
+    grid = template.copy()
+    grid[4, 5] -= 1.0  # one cell selectively deeper -- not explainable by a uniform gain
+    fit = analysis.fit_gain_shape(grid, template)
+    residual = fit["residual"]
+    assert residual[4, 5] == pytest.approx(residual.min())
+    assert abs(residual[4, 5]) > 5 * np.abs(np.delete(residual.ravel(), 4 * 10 + 5)).mean()
+
+
+def test_trough_region_residual_separates_local_from_global():
+    residual = np.zeros((10, 10))
+    residual[4:7, 3:6] = -1.0  # a 3x3 deficit block
+    result = analysis.trough_region_residual(residual, red_idx=5, green_idx=4, half_width=1)
+    assert result["trough_region"] == pytest.approx(-1.0)
+    assert result["rest_of_grid"] == pytest.approx(0.0)
+
+
+# --- variance components (M7) -----------------------------------------------
+
+
+def test_fit_components_recovers_known_within_and_between_sd():
+    """Simulate subjects with a known between-subject SD and known
+    within-subject (run) SD, and check the MixedLM recovers both."""
+    rng = np.random.default_rng(0)
+    true_within, true_between, true_mean = 0.15, 0.35, 1.0
+    n_subjects, n_runs = 40, 4
+    subject_means = rng.normal(true_mean, true_between, size=n_subjects)
+    values_by_subject = {
+        f"S{i}": subject_means[i] + rng.normal(0, true_within, size=n_runs) for i in range(n_subjects)
+    }
+    within_sd, between_sd = variance._fit_components(values_by_subject)
+    assert within_sd == pytest.approx(true_within, rel=0.25)
+    assert between_sd == pytest.approx(true_between, rel=0.25)
+
+
+def test_variance_components_ci_brackets_the_point_estimate():
+    rng = np.random.default_rng(1)
+    values_by_subject = {f"S{i}": rng.normal(1.0, 0.3, size=4) + rng.normal(0, 0.1) for i in range(15)}
+    result = variance.variance_components(values_by_subject, n_boot=100, seed=0)
+    assert result["within_ci"][0] <= result["within_sd"] <= result["within_ci"][1]
+    assert result["between_ci"][0] <= result["between_sd"] <= result["between_ci"][1]
+    assert result["n_subjects"] == 15
+    assert result["n_boot_used"] <= 100
+
+
+def test_within_subject_cv_is_scale_invariant():
+    """CV = SD/|mean|, so scaling every value by a constant leaves it unchanged."""
+    values_by_subject = {"S0": np.array([1.0, 1.2, 0.9, 1.1]), "S1": np.array([2.0, 2.4, 1.8, 2.2])}
+    cv = variance.within_subject_cv(values_by_subject)
+    assert cv["S0"] == pytest.approx(cv["S1"])
+
+
+def test_group_run_values_matches_run_mean_values(data):
+    runmap, baselines, meta = data
+    values = variance.group_run_values(runmap, baselines, meta, 1, group="PD")
+    expected_sub_ids = set(analysis.subjects_in_group(meta, 1, group="PD"))
+    assert set(values) == expected_sub_ids
+    for sub_id, vals in values.items():
+        np.testing.assert_array_equal(
+            vals, analysis.run_mean_values(runmap, baselines, sub_id, 1, normalize=analysis.DEFAULT_NORMALIZE)
+        )
 
 
 # --- figure layout ---------------------------------------------------------

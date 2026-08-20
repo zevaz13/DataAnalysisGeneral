@@ -84,6 +84,10 @@ to point it at different subjects/groups/sessions.
   `baseline_values(scope='session')` concatenated across every subject in
   `sub_ids` -- the baseline analogue of `pooled_pixels`. Always raw: baseline
   is the normalization's own denominator.
+- **`run_mean_values(runmap_df, baselines_df, sub_id, session, *, normalize=None) -> ndarray`**
+  Each run's overall response level for one subject/session -- the mean of
+  that run's grid (100 cells), one scalar per run. The unit `variance.py`'s
+  within/between-subject decomposition (M7) operates on.
 
 ### Trough location (M2)
 
@@ -175,6 +179,28 @@ worked analysis; this is the function reference.
   CI, or resampling `run_grids`' output and refitting for a per-subject
   statistic's CI); called `n_boot` times, NaN replicates dropped before
   taking percentiles.
+
+### Gain/shape decomposition (M8)
+
+See `docs/ssvep_analyses.md` proposal 4 and `10_gain_shape.ipynb` for the full
+worked analysis; this is the function reference.
+
+- **`fit_gain_shape(grid, template) -> dict`**
+  `{gain, intercept, r_squared, residual}` -- linear least squares fit of
+  `grid ~= gain*template + intercept` over all 100 cells, where `template` is
+  typically a reference group's mean grid (e.g. CTR). `gain` is a uniform
+  scaling of the template's whole shape; `residual` (same shape as `grid`) is
+  what's left after removing it -- near zero everywhere means `grid` really
+  is just a scaled/shifted copy of `template`.
+- **`trough_region_residual(residual, red_idx, green_idx, *, half_width=1) -> dict`**
+  `{trough_region, rest_of_grid}` -- mean residual inside a
+  `(2*half_width+1)^2` window centered on `(red_idx, green_idx)` (typically
+  the *template's* own trough location -- see `analysis.trough_location` --
+  not the subject's own, which is exactly the point for subjects whose own
+  trough couldn't be located at all) versus the mean residual everywhere
+  else. A negative `trough_region` well below `rest_of_grid` after gain is
+  removed is the "structured residual concentrated near the trough" proposal
+  4 describes as a shape-specific effect.
 
 ## `plotting.py` -- all figures
 
@@ -424,6 +450,34 @@ at specific pixels).
   worked example). Omit both `trough_*` arguments to get just the 2
   ICC-extreme points.
 
+## `variance.py` -- within/between-subject variance decomposition (M7)
+
+Replicates `docs/ssvep_analyses.md` proposal 3's within/between-subject SD
+split properly: a random-intercept MixedLM fit **per group** (not one pooled
+model -- see `docs/methods.md` for why), plus a subject-level bootstrap CI on
+each variance component. See `09_variance_components.ipynb` for the full
+worked analysis.
+
+- **`group_run_values(runmap_df, baselines_df, metadata_df, session, *, group=None, subgroup=None, normalize=DEFAULT_NORMALIZE) -> dict[str, ndarray]`**
+  `sub_id -> analysis.run_mean_values` for every subject matching
+  `group`/`subgroup` at `session` -- the input every other function in this
+  module takes.
+- **`variance_components(values_by_subject, *, n_boot=2000, seed=0) -> dict`**
+  `{within_sd, between_sd, within_ci, between_ci, n_subjects, n_boot_used}` --
+  fits a random-intercept-only MixedLM (`value ~ 1`, grouped by subject) to
+  get the point estimates, then a subject-level percentile bootstrap (resample
+  subjects with replacement, refit, repeat) for each CI. Each bootstrap
+  resample is relabeled with fresh synthetic subject ids so a real subject
+  drawn twice is correctly treated as two independent subjects for that
+  replicate, not as one subject with double the runs. `n_boot=2000` takes
+  roughly 15-50s per group depending on its size (real per-fit cost is
+  ~15-25ms) -- budget a couple of minutes to run this across every group.
+- **`within_subject_cv(values_by_subject) -> dict[str, float]`**
+  Per-subject within-subject coefficient of variation (`SD/|mean|` of that
+  subject's own run values, `ddof=1`) -- corrects for response magnitude
+  scaling the raw within-subject SD, so groups with different average
+  response sizes stay comparable on noise alone.
+
 ## Build scripts
 
 - **`scripts/build_derived.py`** -- full from-scratch rebuild of
@@ -511,3 +565,25 @@ edit the variables called out below and rerun from that cell down.
   notebook's section 4 for the numbers). *Edit:* `SESSION` (top cell); the
   `reference()` function in section 3 to change what pegged subjects'
   extrapolation targets against.
+- **`09_variance_components.ipynb`** -- M7, `docs/ssvep_analyses.md` proposal
+  3: `variance.variance_components` (MixedLM per group + bootstrap CI) for
+  within/between-subject SD by group, an errorbar plot of both, and
+  `variance.within_subject_cv` to check the "not elevated" finding survives
+  correcting for response-size scaling. Currently PD's within-subject SD is
+  not elevated (confirms the earlier point estimate) and its between-subject
+  CI is wide and overlaps CTR's (also confirms); deutan's between-subject CI
+  does **not** overlap CTR's -- lower, not higher -- which is a new result
+  this notebook's proper model surfaced. *Edit:* `SESSION`, `categories` (top
+  cell); `n_boot` on the `variance_components` call to trade CI precision for
+  runtime.
+- **`10_gain_shape.ipynb`** -- M8, `docs/ssvep_analyses.md` proposal 4:
+  `analysis.fit_gain_shape` against the CTR template for every subject, then
+  `analysis.trough_region_residual` at the template's own trough to ask
+  whether a group's deficit is a uniform gain change or something
+  trough-specific; a cross-check of `gain` against `ramp_intercept` (M6) and
+  `trough_region_residual` against `fitted_amp` (M4/M6). Currently protan
+  shows a genuine trough-specific residual beyond gain (p=0.030, n=8, one
+  test, uncorrected) that PD and deutan don't -- ties together with M6's
+  `ramp_slope_red` finding that protan's trough sits furthest beyond the
+  sampled range. *Edit:* `SESSION` (top cell); swap `group='CTR'` in the
+  `group_grid` call for a different reference template.

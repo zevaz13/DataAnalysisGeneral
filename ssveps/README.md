@@ -48,6 +48,11 @@ first axis is actually **green** and its second **red** (confirmed three ways
   `ramp_r_squared`, M6) that's defined for every row, unlike the `fitted_*`
   columns which can fail to locate an interior trough.
 
+M7's variance components and M8's gain/shape decomposition are not persisted
+to CSV -- both depend on a choice made at analysis time (which group's
+subjects to pool, which template to regress against) rather than being an
+intrinsic per-subject property, so they're computed fresh in their notebooks.
+
 ## Analysis
 
 ### `scripts/analysis.py` — data access, normalization, aggregation
@@ -90,8 +95,19 @@ first axis is actually **green** and its second **red** (confirmed three ways
   the mean
 - `pooled_baseline_values` — every baseline trial value pooled across runs and
   subjects, the baseline analogue of `pooled_pixels`
+- `run_mean_values` — each run's overall response level (mean of that run's
+  grid) for one subject/session, one scalar per run (M7)
+- `fit_gain_shape`/`trough_region_residual` — per-subject gain vs. shape
+  decomposition against a reference template grid (M8)
 - `subject_troughs`/`group_troughs` — the above tabulated per subject-session
   and per group-session (persisted by `scripts/build_troughs.py`)
+
+### `scripts/variance.py` — within/between-subject variance decomposition (M7)
+
+`group_run_values` (per-subject run-mean values for a group/subgroup),
+`variance_components` (random-intercept MixedLM per group + subject-level
+bootstrap CI on within-subject and between-subject SD), `within_subject_cv`
+(scale-corrected within-subject noise, per subject).
 
 ### `scripts/permutation.py` — cluster-based permutation testing
 
@@ -193,3 +209,8 @@ as the working directory.
   bootstrap CI, `ramp_slope_red` as a continuous measure for every CVD subject,
   ramp-crossing extrapolation for pegged subjects, and the protan-vs-deutan
   subtype test
+- `09_variance_components.ipynb` — M7: within/between-subject SD per group
+  via MixedLM with a bootstrap CI, and within-subject CV to check it's not
+  just response-size scaling
+- `10_gain_shape.ipynb` — M8: per-subject gain vs. shape decomposition
+  against the CTR template, and a cross-check against M6's ramp measures

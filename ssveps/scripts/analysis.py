@@ -146,6 +146,19 @@ def pooled_pixels(
     return np.concatenate([flatten_runs(runmap_df, baselines_df, sub_id, session, normalize=normalize) for sub_id in sub_ids])
 
 
+def run_mean_values(
+    runmap_df: pd.DataFrame, baselines_df: pd.DataFrame, sub_id: str, session: int, *, normalize: dict | None = None
+) -> np.ndarray:
+    """Each run's overall response level for one subject/session -- the mean
+    of that run's grid (100 cells, raw or normalized), one scalar per run.
+    This is the unit the within/between-subject variance decomposition (M7,
+    docs/ssvep_analyses.md proposal 3, variance.py) operates on: run-to-run
+    spread in this value is "within-subject" variance, and subject-to-subject
+    spread in each subject's own mean of these values is "between-subject"
+    variance."""
+    return np.array([g.mean() for g in run_grids(runmap_df, baselines_df, sub_id, session, normalize)])
+
+
 def pooled_baseline_values(
     baselines_df: pd.DataFrame, sub_ids: list[str], session: int, *, trials: str = "all"
 ) -> np.ndarray:
@@ -428,6 +441,48 @@ def bootstrap_ci(replicate_fn, *, n_boot: int = 2000, ci: float = 0.95, seed: in
     replicates = replicates[~np.isnan(replicates)]
     alpha = (1 - ci) / 2
     return float(np.quantile(replicates, alpha)), float(np.quantile(replicates, 1 - alpha))
+
+
+def fit_gain_shape(grid: np.ndarray, template: np.ndarray) -> dict:
+    """Per-subject decomposition of a response grid against a reference
+    template (typically the CTR group mean grid): grid ~= gain*template +
+    intercept, fit by linear least squares over the 100 cell values (M8,
+    docs/ssvep_analyses.md proposal 4).
+
+    `gain` is a uniform scaling of the template's whole shape -- gain < 1
+    means a smaller response everywhere, same relative shape as the
+    template. `residual` (grid - fitted, same shape as grid) is what's left
+    after removing that uniform scaling: near zero everywhere means the
+    subject's surface really is just a scaled/shifted copy of the template;
+    a residual concentrated specifically near the template's own trough
+    (see trough_region_residual) means there's a trough-specific effect
+    beyond a uniform gain change, which a gain number alone cannot show."""
+    x, y = template.ravel(), grid.ravel()
+    design = np.column_stack([x, np.ones_like(x)])
+    (gain, intercept), *_ = np.linalg.lstsq(design, y, rcond=None)
+    fitted = gain * x + intercept
+    r_squared = 1 - np.sum((y - fitted) ** 2) / np.sum((y - y.mean()) ** 2)
+    return {
+        "gain": float(gain),
+        "intercept": float(intercept),
+        "r_squared": float(r_squared),
+        "residual": (y - fitted).reshape(grid.shape),
+    }
+
+
+def trough_region_residual(residual: np.ndarray, red_idx: int, green_idx: int, *, half_width: int = 1) -> dict:
+    """Mean residual (fit_gain_shape's output) inside a (2*half_width+1)^2
+    window centered on (red_idx, green_idx) -- typically the reference
+    template's own trough location, not the subject's -- versus the mean
+    residual over the rest of the grid. These are the two numbers proposal 4
+    compares to ask whether a deficit is trough-specific or spread evenly
+    across the whole grid (which fit_gain_shape's uniform gain already
+    explains)."""
+    red_lo, red_hi = max(0, red_idx - half_width), min(residual.shape[0], red_idx + half_width + 1)
+    green_lo, green_hi = max(0, green_idx - half_width), min(residual.shape[1], green_idx + half_width + 1)
+    mask = np.zeros_like(residual, dtype=bool)
+    mask[red_lo:red_hi, green_lo:green_hi] = True
+    return {"trough_region": float(residual[mask].mean()), "rest_of_grid": float(residual[~mask].mean())}
 
 
 # Default surface-fit model. ramp_gaussian fits every subject-session in this

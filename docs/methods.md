@@ -183,6 +183,93 @@ refitting) for a single subject's fitted-statistic CI (e.g. the ramp-crossing
 extrapolation above). `run_grids` was made public specifically to support the
 latter.
 
+## Within/between-subject variance decomposition (M7)
+
+`variance.py` replaces the point-estimate within/between SD split in
+`docs/ssvep_analyses.md` proposal 3 with a random-intercept MixedLM
+(`statsmodels`) fit **per group** -- `value ~ 1`, grouped by subject, where
+`value` is `analysis.run_mean_values`: one scalar per run, the mean of that
+run's percent-change grid. The residual variance is within-subject
+(run-to-run) spread; the random-intercept variance is between-subject spread.
+
+**Why per group, not one pooled model.** The originally proposed alternative
+was a single MixedLM across all subjects with group as a fixed effect and
+`vc_formula` giving each group its own between-subject variance component.
+That's closer to "one model, group as fixed effect," and would let you test
+group differences in variance within one framework -- but it bakes in a
+shared-residual-variance assumption across groups, and is materially more
+complex to build and interpret. Decided against it (2026-08-20): fit each
+group separately instead. This is justified by this project's own prior
+finding that within-subject CV is roughly flat across groups already, so a
+shared-residual assumption wasn't expected to change much, and the simpler
+per-group models are what directly produces the per-group table this
+milestone's checklist asked for.
+
+**CI method.** `statsmodels`' own asymptotic standard errors on variance
+components are unreliable at small n, so `variance.variance_components` uses
+a subject-level percentile bootstrap instead (resample subjects with
+replacement, refit, repeat -- `n_boot=2000` by default, matching the
+bootstrap convention `docs/ssvep_analyses.md` already established elsewhere
+in this project). Each bootstrap resample relabels subjects with fresh
+synthetic ids (0..n-1) rather than reusing the real `sub_id` -- otherwise
+drawing the same real subject twice in one resample would be misread by
+`MixedLM` as one subject contributing double the runs, silently distorting
+the within/between split for that replicate.
+
+**Real-data finding worth flagging directly.** PD's within-subject SD is not
+elevated (confirms the earlier point estimate), and its between-subject SD's
+CI (`[0.12, 0.56]`) is wide and overlaps CTR's (`[0.19, 0.35]`) -- also
+consistent with the earlier finding. Deutan's between-subject SD (`[0.00,
+0.13]`) does **not** overlap CTR's -- lower, not higher. That's the opposite
+of what "a neurological condition increases heterogeneity" would predict, and
+it only showed up once the decomposition was done properly (`09_variance_
+components.ipynb`) -- worth treating as a real result to revisit as more
+session-2 CVD data comes in, not explaining away.
+
+## Gain vs. shape decomposition (M8)
+
+`analysis.fit_gain_shape(grid, template)` fits `grid ~= gain*template +
+intercept` by linear least squares over all 100 cells -- `template` is
+typically the CTR group mean grid (`analysis.group_grid(..., group='CTR')`).
+`analysis.trough_region_residual(residual, red_idx, green_idx)` then asks
+whether what's left over after removing that uniform gain is concentrated in
+a window around a *fixed* location -- the **template's own trough**
+(`analysis.trough_location(template, ...)`), not each subject's own -- versus
+spread evenly across the rest of the grid. Using the template's trough
+location rather than the subject's own is deliberate: it's exactly what lets
+this analysis say something about subjects whose own trough couldn't be
+located at all (most protan/deutan subjects, per M6).
+
+**This does not reproduce `docs/ssvep_analyses.md` proposal 1's "PD is 16%
+below CTR" number, and that's expected.** Proposal 1's number came from
+*trough depth* alone (`subject_troughs.csv`'s `depth` column, one localized
+quantity); `gain` here is a regression over the *whole* 100-cell grid,
+dominated by the ramp rather than the trough. Different statistics, expected
+to diverge -- don't treat a mismatch between the two as a bug.
+
+**Real-data finding.** After removing gain, PD's and deutan's residuals at
+the CTR template's trough are indistinguishable from zero (one-sample t-test
+vs. 0: p=0.56, p=0.63) -- no trough-specific effect beyond gain for either.
+Protan's is not (mean -0.10, p=0.030, n=8, one test, uncorrected) -- a
+genuine shape effect. This connects to M6: protan had the shallowest
+`ramp_slope_red` of the three groups, i.e. the trough sitting furthest beyond
+the sampled range on average, which is exactly what would put a protan
+subject's response at the CTR template's trough location still on their own
+descending ramp rather than recovering the way CTR's template does past its
+own dip.
+
+**Cross-check against M6's separable measures.** `gain` (this decomposition)
+correlates strongly with `ramp_intercept` (M6's `fit_ramp`, r=0.87,
+p<1e-13) -- two independently-derived gain proxies agree well, good evidence
+"gain" is a real, robustly-measurable axis here. `trough_region_residual`
+does **not** correlate with `fitted_amp` (M4/M6's `fit_ramp_gaussian`, r=0.04,
+p=0.79) -- not a failure, they measure different things: `fitted_amp` is
+subject-centered (this subject's own dip depth, wherever their dip is);
+`trough_region_residual` is template-centered (the residual at one fixed
+external location). They can disagree completely for a subject whose own
+trough is nowhere near the template's, which is exactly the case
+`trough_region_residual` exists to handle.
+
 ## Cluster-based permutation testing (M3)
 
 `permutation.py` replicates `ssveps/templateCode/permTestingcomparisons/*.m`

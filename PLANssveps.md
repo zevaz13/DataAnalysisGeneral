@@ -133,24 +133,41 @@ Carry this into `methods.md` when M6-M10 land.
   - [x] Recommendation written into the notebook and `docs/methods.md`:
     extend the red stimulus axis -- this is what would turn section 4's
     suggestive-but-not-significant result into a real one.
-- [ ] **M7 - Proposal 3: variance decomposition (within vs. between subject).**
-  - [ ] Fit a variance-components model (subject random effect, nested runs,
-    group fixed effect) across all subjects with `statsmodels` `MixedLM`,
-    replacing the current point-estimate SD split.
-  - [ ] Report within- and between-subject SD with CIs per group (CTR, PD,
-    protan, deutan), and the within-subject CV to confirm it's flat across
-    groups once response-size scaling is corrected for.
-  - [ ] Note where between-subject spread is (not yet) distinguishable from
-    CTR at current n, and what covariates (severity, duration, medication
-    state for PD; deficiency severity for CVD) would make the comparison
-    sharper if collected.
-- [ ] **M8 - Proposal 4: gain vs. shape decomposition.**
-  - [ ] Per-subject fit `subject_surface ~= a * CTR_template + b` against the
-    CTR group-mean grid.
-  - [ ] Compare `a` (gain) and residual structure near the trough (shape)
-    across groups, especially protan/deutan.
-  - [ ] Cross-check against the `ramp_gaussian` fit's own separable measures:
-    `fitted_amp` (shape) vs. the ramp intercept (gain).
+- [x] **M7 - Proposal 3: variance decomposition (within vs. between subject).**
+  `09_variance_components.ipynb`, `variance.py`. Fit a random-intercept
+  MixedLM **per group** (not one pooled model with `vc_formula` -- see
+  `docs/methods.md` for why) plus a subject-level bootstrap CI, replacing the
+  point-estimate SD split.
+  - [x] Within-subject SD: PD (0.104) not elevated vs. CTR (0.142) -- confirms
+    the earlier point estimate on a proper footing.
+  - [x] Between-subject SD with 95% bootstrap CI (n_boot=2000): CTR 0.282
+    [0.19, 0.35], PD 0.414 [0.12, 0.56] (wide, overlaps CTR -- not
+    established as more variable, confirms proposal 3), protan 0.194 [0.10,
+    0.23] (overlaps CTR), deutan 0.091 [0.00, 0.13] (**does not** overlap
+    CTR -- lower, not higher). The deutan result is new and unexpected --
+    opposite direction from "condition increases heterogeneity" -- flagged
+    as a real finding to revisit with more data, not explained away.
+  - [x] Within-subject CV (scale-corrected): roughly flat across groups
+    (CTR 0.19, PD 0.17, protan 0.21, deutan 0.23) -- confirms it's not
+    response-size scaling driving the within-subject picture.
+  - [x] Covariates note written into `docs/methods.md`/the notebook: PD
+    severity/duration/medication state, CVD severity score -- none currently
+    in the dataset, highest-value addition if this line is worth pursuing.
+- [x] **M8 - Proposal 4: gain vs. shape decomposition.** `10_gain_shape.ipynb`.
+  - [x] Per-subject `fit_gain_shape`: `grid ~= gain*CTR_template + intercept`
+    over all 100 cells, for every subject at session 1.
+  - [x] `trough_region_residual` at the *template's* own trough (not each
+    subject's own -- the point, for subjects whose own trough couldn't be
+    located): PD and deutan residuals indistinguishable from zero (p=0.56,
+    p=0.63); **protan's is not** (mean -0.10, p=0.030, n=8, one test,
+    uncorrected) -- a genuine trough-specific effect beyond gain. Connects to
+    M6: protan had the shallowest `ramp_slope_red`, i.e. the trough sitting
+    furthest beyond the sampled range on average.
+  - [x] Cross-check: `gain` vs. `ramp_intercept` (M6) r=0.87, p<1e-13 -- two
+    independent gain proxies agree well. `trough_region_residual` vs.
+    `fitted_amp` (M4/M6) r=0.04, p=0.79 -- genuinely don't agree, because
+    they measure different things (template-centered vs. subject-centered);
+    not a bug, written up as such in `docs/methods.md`.
 - [ ] **M9 - Proposal 5: reliability-first outcome selection.**
   - [ ] Extend the `reliability.py` ICC machinery from per-pixel maps to the
     per-subject features (`depth`, `fitted_green`, `fitted_amp`, `fitted_red`)
