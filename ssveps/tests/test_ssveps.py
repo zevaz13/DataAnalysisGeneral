@@ -16,6 +16,14 @@ from scipy.stats import norm
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+# beh/scripts/ has its own loader.py/plotting.py -- if a combined run (e.g.
+# bare `pytest` at the repo root) collected that test module first, sys.modules
+# would already hold beh's versions under these bare names. Drop them so the
+# imports below re-resolve against SCRIPTS, just inserted at sys.path[0],
+# regardless of what ran before this module in the same pytest session.
+for _name in ("loader", "plotting"):
+    sys.modules.pop(_name, None)
+
 import analysis  # noqa: E402
 import plotting  # noqa: E402
 import permutation  # noqa: E402

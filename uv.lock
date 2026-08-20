@@ -351,6 +351,18 @@ wheels = [
 ]
 
 [[package]]
+name = "click"
+version = "8.4.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/76/d4/81420972a676e8ffea40450d8c8c92943e7218a78fe9b64359836cc9876b/click-8.4.2.tar.gz", hash = "sha256:9a6cea6e60b17ebe0a44c5cc636d94f09bd66142c1cd7d8b4cd731c4917a15f6", size = 338000, upload-time = "2026-06-24T17:45:15.148Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fb/e2/79c688af8b210d232694e31e59da9f6ec747bae31c3f5946e4e9b98860d5/click-8.4.2-py3-none-any.whl", hash = "sha256:e6f9f66136c816745b9d65817da91d61d957fb16e02e4dcd0552553c5a197b76", size = 119243, upload-time = "2026-06-24T17:45:13.73Z" },
+]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -437,6 +449,7 @@ name = "data-analysis"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "hotelling" },
     { name = "ipykernel" },
     { name = "matplotlib" },
     { name = "notebook" },
@@ -457,6 +470,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "hotelling", specifier = ">=0.5.0" },
     { name = "ipykernel", specifier = "<7" },
     { name = "matplotlib", specifier = ">=3.11.1" },
     { name = "notebook", specifier = ">=7.6.2" },
@@ -575,6 +589,22 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/01/ee/02a2c011bdab74c6fb3c75474d40b3052059d95df7e73351460c8588d963/h11-0.16.0.tar.gz", hash = "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1", size = 101250, upload-time = "2025-04-24T03:35:25.427Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86", size = 37515, upload-time = "2025-04-24T03:35:24.344Z" },
+]
+
+[[package]]
+name = "hotelling"
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ba/8f/030ed4e1fa2a50a8e29e7d1d0c19169ca6d89b332a366ddf71b7177fa2dd/hotelling-0.5.0.tar.gz", hash = "sha256:300998361269129c9947397fe1ec4a4aec95c35d410d719e8bb02a71f79fa3e4", size = 40399, upload-time = "2021-07-21T11:38:44.37Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/67/8c/4cddb4dde1ce208feab8a0209f87ef9a15bdbf61610d9845acec871c25fa/hotelling-0.5.0-py2.py3-none-any.whl", hash = "sha256:4f6259160a47930e058e6d5cf65069b5baa7fd049b960c22766172fb57c7d770", size = 13120, upload-time = "2021-07-21T11:38:43.407Z" },
 ]
 
 [[package]]
