@@ -21,6 +21,7 @@ from analysis import (
     mean_grid,
     mean_grid_across_subjects,
     normalized_grid,
+    pooled_baseline_values,
     pooled_pixels,
     raw_grid,
     subjects_in_group,
@@ -565,6 +566,28 @@ def plot_groups_mean_boxplot(
     return ax
 
 
+def plot_groups_baseline_boxplot(
+    baselines_df: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    session: int,
+    categories: list[dict],
+    *,
+    trials: str = "all",
+) -> plt.Axes:
+    """One box per category, its raw baseline trial values pooled across every
+    run and subject in that category -- for comparing the baseline itself
+    across groups, not a normalized response. Always raw: the baseline is the
+    normalization's own denominator, so there is nothing to normalize it
+    against. categories as in plot_groups_side_by_side."""
+    sub_id_lists = [subjects_in_group(metadata_df, session, group=cat.get("group"), subgroup=cat.get("subgroup")) for cat in categories]
+    data = [pooled_baseline_values(baselines_df, sub_ids, session, trials=trials) for sub_ids in sub_id_lists]
+    labels = [f"{cat['label']} (n={len(sub_ids)})" for cat, sub_ids in zip(categories, sub_id_lists)]
+    _, ax = plt.subplots()
+    _boxplot(ax, data, labels, ylabel="baseline (raw)")
+    ax.set_title(f"session {session} -- baseline values by group")
+    return ax
+
+
 MARKER_SHAPES = ["o", "s", "^", "D", "v", "P", "X"]
 
 
@@ -587,6 +610,24 @@ def plot_trough_scatter(troughs_df: pd.DataFrame, label_col: str, *, ax: plt.Axe
     ax.set_ylabel("green")
     ax.legend(title=label_col)
     ax.set_title("trough locations")
+    return ax
+
+
+def plot_troughs_boxplot(
+    troughs_df: pd.DataFrame, value_col: str, label_col: str, *, ylabel: str | None = None, ax: plt.Axes | None = None
+) -> plt.Axes:
+    """One box per distinct label_col value in troughs_df (a subject_troughs
+    table, or anything with that shape), from troughs_df[value_col] -- e.g.
+    ramp_slope_red by subgroup (M6), or any other per-subject scalar feature
+    against group/subgroup/label. NaN values are dropped per category (a
+    fit column can be NaN for subjects where that particular fit failed)."""
+    if ax is None:
+        _, ax = plt.subplots()
+    labels_present = sorted(troughs_df[label_col].unique())
+    data = [troughs_df.loc[troughs_df[label_col] == label, value_col].dropna().to_numpy() for label in labels_present]
+    labels = [f"{label} (n={len(d)})" for label, d in zip(labels_present, data)]
+    _boxplot(ax, data, labels, ylabel=ylabel or value_col)
+    ax.set_title(f"{value_col} by {label_col}")
     return ax
 
 

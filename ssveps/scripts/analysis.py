@@ -98,10 +98,15 @@ def normalized_grid(
     return normalize_grid(raw, bvals, method=method)
 
 
-def _run_grids(
+def run_grids(
     runmap_df: pd.DataFrame, baselines_df: pd.DataFrame, sub_id: str, session: int, normalize: dict | None
 ) -> list[np.ndarray]:
-    """Each run's grid (raw or normalized) for one subject/session, in run order."""
+    """Each run's grid (raw or normalized) for one subject/session, in run
+    order. Public (not just an internal helper for mean_grid/flatten_runs)
+    because a run-level bootstrap -- resample which runs go into the mean,
+    with replacement -- needs the individual run grids directly rather than
+    their average; see the ramp-crossing extrapolation CI in
+    08_cvd_gamut.ipynb."""
     runs = sorted(runmap_df.query("sub_id == @sub_id and session == @session")["run"].unique())
     if normalize is None:
         return [raw_grid(runmap_df, sub_id, session, run) for run in runs]
@@ -116,7 +121,7 @@ def mean_grid(
     each run is normalized individually, then the runs are averaged)."""
     if normalize is None:
         return mean_raw_grid(runmap_df, sub_id, session)
-    return np.mean(_run_grids(runmap_df, baselines_df, sub_id, session, normalize), axis=0)
+    return np.mean(run_grids(runmap_df, baselines_df, sub_id, session, normalize), axis=0)
 
 
 def flatten_runs(
@@ -124,7 +129,7 @@ def flatten_runs(
 ) -> np.ndarray:
     """Every pixel of every run of one subject/session, concatenated into one
     1D array (400 values for 4-run subjects, 300 for the ragged 3-run ones)."""
-    grids = _run_grids(runmap_df, baselines_df, sub_id, session, normalize)
+    grids = run_grids(runmap_df, baselines_df, sub_id, session, normalize)
     return np.concatenate([g.ravel() for g in grids])
 
 
@@ -139,6 +144,19 @@ def pooled_pixels(
     """flatten_runs for every subject in sub_ids, concatenated into one pooled
     1D array (a group's entire raw pixel distribution, not averaged)."""
     return np.concatenate([flatten_runs(runmap_df, baselines_df, sub_id, session, normalize=normalize) for sub_id in sub_ids])
+
+
+def pooled_baseline_values(
+    baselines_df: pd.DataFrame, sub_ids: list[str], session: int, *, trials: str = "all"
+) -> np.ndarray:
+    """Every baseline trial value (scope='session', i.e. pooled across every
+    run) for every subject in sub_ids, concatenated -- the baseline-value
+    analogue of pooled_pixels, for comparing the raw baseline itself across
+    groups (baselines are the normalization's own denominator, so this is
+    always raw, never normalized)."""
+    return np.concatenate(
+        [baseline_values(baselines_df, sub_id, session, scope="session", trials=trials) for sub_id in sub_ids]
+    )
 
 
 def subjects_in_group(
@@ -360,6 +378,58 @@ def fit_ramp_gaussian(grid: np.ndarray, red_vals: list[float], green_vals: list[
     }
 
 
+def fit_ramp(grid: np.ndarray, red_vals: list[float], green_vals: list[float]) -> dict:
+    """Fit z = c0 + c1*x + c2*y -- the ramp term alone, no dip -- via linear
+    least squares. Where fit_ramp_gaussian pegs a subject's dip against the
+    sampled-range bound (at_bound=True), the dip has degenerated into
+    re-fitting the ramp anyway (see fit_ramp_gaussian's docstring), so a
+    dedicated ramp-only fit gives the same information more directly and
+    without a nonlinear solve: slope_red is a continuous measure of "how fast
+    does the response fall off with red" that every subject has, whether or
+    not their trough itself was ever sampled (M6, docs/ssvep_analyses.md
+    proposal 2)."""
+    x, y = np.meshgrid(red_vals, green_vals, indexing="ij")
+    x, y, z = x.ravel(), y.ravel(), grid.ravel()
+    design = np.column_stack([np.ones_like(x), x, y])
+    (c0, c1, c2), *_ = np.linalg.lstsq(design, z, rcond=None)
+    z_pred = design @ [c0, c1, c2]
+    r_squared = 1 - np.sum((z - z_pred) ** 2) / np.sum((z - z.mean()) ** 2)
+    return {"intercept": c0, "slope_red": c1, "slope_green": c2, "r_squared": r_squared}
+
+
+def extrapolate_ramp_crossing(ramp: dict, target_depth: float, green_ref: float) -> float:
+    """The red value at which a fitted ramp (fit_ramp's output) would reach
+    target_depth at green=green_ref: solves target_depth = intercept +
+    slope_red*red + slope_green*green_ref for red.
+
+    For a pegged subject this deliberately does not use that subject's own
+    fitted trough depth/green (fit_ramp_gaussian already reports those as
+    unreliable when at_bound) -- pass a target_depth/green_ref derived from
+    subjects whose trough *was* actually located (e.g. the median fitted_depth
+    and fitted_green among fit_valid subjects of the same subgroup), so the
+    result estimates "how far beyond the sampled range would this subject's
+    ramp need to extend to reach a typical trough" rather than reproducing the
+    pegged fit's own boundary value. Always beyond the sampled range for a
+    pegged subject by construction -- this is extrapolation, not a
+    measurement, and should be labelled as such wherever reported."""
+    return (target_depth - ramp["intercept"] - ramp["slope_green"] * green_ref) / ramp["slope_red"]
+
+
+def bootstrap_ci(replicate_fn, *, n_boot: int = 2000, ci: float = 0.95, seed: int | None = 0) -> tuple[float, float]:
+    """Percentile bootstrap confidence interval. replicate_fn(rng) computes
+    and returns one resampled statistic (using rng for its own resampling,
+    e.g. rng.integers to pick which runs/subjects to resample with
+    replacement); called n_boot times. NaN replicates (e.g. a degenerate
+    resample) are dropped before taking percentiles. Generic over what's being
+    resampled -- used both for a group proportion's CI (resample subjects) and
+    for a per-subject fitted statistic's CI (resample runs)."""
+    rng = np.random.default_rng(seed)
+    replicates = np.array([replicate_fn(rng) for _ in range(n_boot)])
+    replicates = replicates[~np.isnan(replicates)]
+    alpha = (1 - ci) / 2
+    return float(np.quantile(replicates, alpha)), float(np.quantile(replicates, 1 - alpha))
+
+
 # Default surface-fit model. ramp_gaussian fits every subject-session in this
 # dataset (62/62) where paraboloid manages 37/62, at a higher r-squared, and it
 # is the only one of the three that also reports the dip's width.
@@ -398,13 +468,23 @@ def subject_troughs(
     yields fitted_amp (dip depth relative to the local ramp) and
     fitted_sigma_red/fitted_sigma_green (dip width along each axis), which the
     argmin cannot provide at all. normalize=None for raw depth, otherwise a
-    scope/trials/method dict as elsewhere."""
+    scope/trials/method dict as elsewhere.
+
+    Also adds a separate ramp-only fit (fit_ramp, M6): ramp_intercept,
+    ramp_slope_red, ramp_slope_green, ramp_r_squared. Unlike fitted_red/
+    fitted_green/fitted_amp, these are defined -- and meaningful -- for every
+    subject regardless of fitted_at_bound/fitted_valid, since a ramp has no
+    interior minimum to fail to find. This is what makes CVD subjects whose
+    trough lies beyond the sampled red range still usable: ramp_slope_red is
+    the continuous measure to compare across all of them (see
+    docs/ssvep_analyses.md proposal 2 and 08_cvd_gamut.ipynb)."""
     red_vals, green_vals = load_grid_axes()
     rows = []
     for meta in metadata_df.to_dict("records"):
         grid = mean_grid(runmap_df, baselines_df, meta["sub_id"], meta["session"], normalize=normalize)
         loc = trough_location(grid, red_vals, green_vals)
         fit = fit_trough_surface(grid, red_vals, green_vals, method=surface_method)
+        ramp = fit_ramp(grid, red_vals, green_vals)
         rows.append(
             {
                 "sub_id": meta["sub_id"],
@@ -421,6 +501,10 @@ def subject_troughs(
                 "fitted_r_squared": fit["r_squared"],
                 "fitted_at_bound": fit["at_bound"],
                 "fitted_valid": fit["fit_valid"],
+                "ramp_intercept": ramp["intercept"],
+                "ramp_slope_red": ramp["slope_red"],
+                "ramp_slope_green": ramp["slope_green"],
+                "ramp_r_squared": ramp["r_squared"],
             }
         )
     return pd.DataFrame(rows)

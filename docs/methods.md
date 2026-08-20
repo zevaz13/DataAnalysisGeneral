@@ -138,6 +138,51 @@ paired subjects for a reliability analysis. This will change if/when more
 session-2 data for the CVD subgroups is collected -- no code change would be
 needed, just enough subjects for the existing `ValueError` to stop firing.
 
+## Ramp-only fit, extrapolation, and bootstrap CIs (M6)
+
+`analysis.fit_ramp` fits just the linear term (`z = c0 + c1*x + c2*y`) that
+`fit_ramp_gaussian` already includes alongside its dip -- no dip, closed-form
+least squares. The reason it exists as its own function rather than just
+reading `fit_ramp_gaussian`'s ramp coefficients: `fit_ramp_gaussian` doesn't
+expose them, and more importantly, a dedicated ramp fit has no interior
+minimum to fail to find, so `ramp_slope_red` is defined for every subject --
+including the CVD subjects whose trough lies beyond the sampled red range and
+whose `fit_ramp_gaussian` fit therefore pegs (`at_bound=True`). See
+`docs/ssvep_analyses.md` proposal 2 for the motivating finding (11/15 CVD
+subjects pegged at session 1 vs 4/21 CTR) and `08_cvd_gamut.ipynb` for the
+full worked analysis.
+
+**Extrapolation target.** `analysis.extrapolate_ramp_crossing` solves the
+fitted ramp line for the red value at which it would reach a given
+`target_depth` at a given `green_ref`. For a pegged subject, that target
+must **not** come from the subject's own `fit_ramp_gaussian` fit -- that's
+exactly the fit `at_bound` says is unreliable there. `08_cvd_gamut.ipynb`
+uses the median `fitted_depth`/`fitted_green` among each subgroup's own
+`fitted_valid` subjects instead (decided explicitly, not defaulted to). That
+reference is thin (2 valid protan, 2 valid deutan, project-wide) -- the
+notebook says so directly rather than quoting the resulting extrapolated
+positions as more precise than they are.
+
+**The extrapolated position is unstable per-subject.** Dividing by a fitted
+slope that happens to be close to zero for a given subject blows up both the
+point estimate and its bootstrap CI (one pegged subject's 95% CI spans
+roughly [-190000, 84000]; two pegged subjects' point estimates even land at
+negative red, which is unphysical). Use it only as group-level, qualitative
+support ("the trough is out there somewhere beyond the sampled range") --
+`ramp_slope_red` itself is the stable, comparable per-subject measure, and
+should be preferred for any actual group comparison.
+
+**Bootstrap CIs generally.** `analysis.bootstrap_ci` is a generic percentile
+bootstrap: it takes a `replicate_fn(rng)` that does its own resampling and
+returns one statistic, calls it `n_boot` times, and returns the percentile
+CI. Two different resampling units are used in this project depending on
+what's being estimated: resampling *subjects* (with replacement) for a group
+proportion's CI (e.g. `fitted_at_bound` sensitivity/specificity), and
+resampling *runs* via `analysis.run_grids` (with replacement, then
+refitting) for a single subject's fitted-statistic CI (e.g. the ramp-crossing
+extrapolation above). `run_grids` was made public specifically to support the
+latter.
+
 ## Cluster-based permutation testing (M3)
 
 `permutation.py` replicates `ssveps/templateCode/permTestingcomparisons/*.m`

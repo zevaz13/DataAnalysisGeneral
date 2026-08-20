@@ -166,6 +166,81 @@ def test_fit_trough_surface_methods_share_a_schema(axes):
         assert set(analysis.fit_trough_surface(grid, red_vals, green_vals, method=method)) == keys
 
 
+# --- ramp-only fit, extrapolation, bootstrap CI (M6) ------------------------
+
+
+def test_fit_ramp_recovers_a_known_slope(axes):
+    """Pure linear surface, no dip -- fit_ramp should recover it almost exactly
+    (closed-form least squares on noiseless data)."""
+    red_vals, green_vals = axes
+    x, y = np.meshgrid(red_vals, green_vals, indexing="ij")
+    grid = 2.0 - 0.0003 * x + 0.0001 * y
+    fit = analysis.fit_ramp(grid, red_vals, green_vals)
+    assert fit["slope_red"] == pytest.approx(-0.0003, abs=1e-9)
+    assert fit["slope_green"] == pytest.approx(0.0001, abs=1e-9)
+    assert fit["r_squared"] > 0.999
+
+
+def test_fit_ramp_defined_even_when_ramp_gaussian_pegs(axes):
+    """The whole point of fit_ramp for M6: it has no interior minimum to fail
+    to find, so it stays usable on exactly the pure-ramp case where
+    fit_ramp_gaussian pegs at_bound (see test_at_bound_fit_is_not_reported_valid)."""
+    red_vals, green_vals = axes
+    x, _ = np.meshgrid(red_vals, green_vals, indexing="ij")
+    grid = 2.0 - 0.0004 * x
+    assert analysis.fit_ramp_gaussian(grid, red_vals, green_vals)["at_bound"]
+    fit = analysis.fit_ramp(grid, red_vals, green_vals)
+    assert fit["slope_red"] == pytest.approx(-0.0004, abs=1e-9)
+    assert not np.isnan(fit["r_squared"])
+
+
+def test_extrapolate_ramp_crossing_solves_the_linear_equation():
+    ramp = {"intercept": 10.0, "slope_red": -0.01, "slope_green": 0.0}
+    red = analysis.extrapolate_ramp_crossing(ramp, target_depth=5.0, green_ref=0.0)
+    assert red == pytest.approx(500.0)
+    assert 10.0 + -0.01 * red == pytest.approx(5.0)
+
+
+def test_bootstrap_ci_is_tight_around_a_constant():
+    lo, hi = analysis.bootstrap_ci(lambda rng: 3.0, n_boot=200)
+    assert lo == pytest.approx(3.0)
+    assert hi == pytest.approx(3.0)
+
+
+def test_bootstrap_ci_brackets_the_resampled_mean():
+    values = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    rng_master = np.random.default_rng(0)
+
+    def replicate(rng):
+        return rng.choice(values, size=len(values), replace=True).mean()
+
+    lo, hi = analysis.bootstrap_ci(replicate, n_boot=2000, seed=0)
+    assert lo < values.mean() < hi
+    del rng_master  # unused, just documents replicate_fn's own rng is independent of any caller state
+
+
+def test_subject_troughs_ramp_columns_are_never_nan(data):
+    """Unlike fitted_*, the ramp-only columns must be defined for every
+    subject regardless of fitted_at_bound/fitted_valid -- that's what lets
+    ramp_slope_red be used for all 15 CVD subjects instead of just the ones
+    with an interior trough (M6)."""
+    runmap, baselines, meta = data
+    subset = meta[meta["sub_id"].isin(["MET015", "MET016", "MET000"])]
+    df = analysis.subject_troughs(runmap, baselines, subset)
+    for col in ("ramp_intercept", "ramp_slope_red", "ramp_slope_green", "ramp_r_squared"):
+        assert col in df.columns
+        assert not df[col].isna().any()
+
+
+def test_pooled_baseline_values_pools_across_subjects_and_runs(data):
+    _, baselines, _ = data
+    one = analysis.baseline_values(baselines, "MET000", 1, scope="session", trials="all")
+    pooled = analysis.pooled_baseline_values(baselines, ["MET000"], 1)
+    np.testing.assert_array_equal(pooled, one)
+    two = analysis.pooled_baseline_values(baselines, ["MET000", "MET001"], 1)
+    assert len(two) == len(one) + len(analysis.baseline_values(baselines, "MET001", 1, scope="session", trials="all"))
+
+
 # --- permutation testing ---------------------------------------------------
 
 

@@ -43,7 +43,10 @@ first axis is actually **green** and its second **red** (confirmed three ways
 - `baselines.csv` — tidy long format: `sub_id, session, run, trial, value` (1-based `run`/`trial`)
 - `subject_troughs.csv` / `group_troughs.csv` — per subject-session and per
   group-session trough location and depth, both grid-argmin and surface-fit
-  (built by `scripts/build_troughs.py`)
+  (built by `scripts/build_troughs.py`). `subject_troughs.csv` also carries a
+  ramp-only fit (`ramp_intercept`/`ramp_slope_red`/`ramp_slope_green`/
+  `ramp_r_squared`, M6) that's defined for every row, unlike the `fitted_*`
+  columns which can fail to locate an interior trough.
 
 ## Analysis
 
@@ -66,9 +69,27 @@ first axis is actually **green** and its second **red** (confirmed three ways
 - `interpolate_grid(grid, shape)` — resize a grid to an arbitrary (including
   rectangular) resolution via linear interpolation
 - `trough_location` — argmin location and depth on the native 10x10 grid
-- `fit_paraboloid`/`fit_gaussian` behind `fit_trough_surface(..., method=)` —
-  parametric surface fit locating a continuous, off-grid minimum; both report
-  `fit_valid` and `r_squared`
+- `fit_paraboloid`/`fit_gaussian`/`fit_ramp_gaussian` behind
+  `fit_trough_surface(..., method=)` — parametric surface fit locating a
+  continuous, off-grid minimum; `fit_ramp_gaussian` (default) is a linear ramp
+  plus a bounded Gaussian dip and is the only one that converges on every
+  subject-session; all report `fit_valid`/`at_bound` and `r_squared`
+- `fit_ramp` — the ramp term alone, no dip (M6); `intercept`/`slope_red`/
+  `slope_green`/`r_squared`, defined for every subject regardless of whether a
+  trough was ever located — the continuous measure used for CVD subjects whose
+  trough lies beyond the sampled red range
+- `extrapolate_ramp_crossing` — given a `fit_ramp` result and a target
+  depth/green (typically a population reference, not the subject's own
+  unreliable fit), the red value at which that ramp would reach it —
+  extrapolation beyond the sampled range, not a measurement
+- `bootstrap_ci` — generic percentile bootstrap CI over any resampling
+  function; used for both a group proportion's CI and a per-subject fitted
+  statistic's CI (see `08_cvd_gamut.ipynb`)
+- `run_grids` — each run's own grid for one subject/session (what `mean_grid`
+  averages); public so a run-level bootstrap can resample which runs go into
+  the mean
+- `pooled_baseline_values` — every baseline trial value pooled across runs and
+  subjects, the baseline analogue of `pooled_pixels`
 - `subject_troughs`/`group_troughs` — the above tabulated per subject-session
   and per group-session (persisted by `scripts/build_troughs.py`)
 
@@ -110,9 +131,14 @@ values a diverging blue/red one centered on zero (signed).
 - Distributions: `plot_subject_boxplot`/`plot_subject_mean_boxplot` and their
   `_histogram` twins, `plot_subjects_boxplot`/`plot_subjects_mean_boxplot`
   (one box per subject), `plot_group_pooled_boxplot`/`plot_group_mean_boxplot`,
-  `plot_groups_pooled_boxplot`/`plot_groups_mean_boxplot`
+  `plot_groups_pooled_boxplot`/`plot_groups_mean_boxplot`,
+  `plot_groups_baseline_boxplot` (raw baseline values by group/category, not
+  pixel values)
 - Troughs: `plot_trough_scatter` (locations across subjects/groups),
-  `plot_trough_locations` (methods overlaid on one subject's heatmap)
+  `plot_trough_locations` (methods overlaid on one subject's heatmap),
+  `plot_troughs_boxplot` (any per-subject scalar column from a
+  `subject_troughs`-shaped table, one box per category — e.g. `ramp_slope_red`
+  by subgroup)
 - Permutation: `plot_permutation_test_size`/`_weighted`/`_directional` and
   `plot_permutation_null_histogram`
 - Reliability: `plot_icc_map`, `plot_bland_altman`, `plot_session_scatter`,
@@ -155,10 +181,15 @@ as the working directory.
   with all normalization methods and an interpolated 100x100 view, plus the four
   main categories side by side with sample sizes
 - `04_distributions.ipynb` — boxplots and histograms per subject and per group
-  (pooled and mean-grid), and the trough-location scatter
+  (pooled and mean-grid), the trough-location scatter, and a raw baseline
+  comparison across groups
 - `05_permutation_testing.ipynb` — all three permutation tests on `PD`/`protan`/
   `deutan` vs `HC`, with null-distribution histograms
 - `06_trough_surface_fit.ipynb` — paraboloid and gaussian fits overlaid on the
   grid argmin, plus fit-quality summaries across all 62 subject-sessions
 - `07_test_retest_reliability.ipynb` — ICC maps for the full paired set and per
   group, with Bland-Altman and session-scatter plots at selected pixels
+- `08_cvd_gamut.ipynb` — M6: `fitted_at_bound` as a CVD/CTR diagnostic with a
+  bootstrap CI, `ramp_slope_red` as a continuous measure for every CVD subject,
+  ramp-crossing extrapolation for pegged subjects, and the protan-vs-deutan
+  subtype test

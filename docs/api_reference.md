@@ -75,17 +75,31 @@ to point it at different subjects/groups/sessions.
 - **`pooled_pixels(runmap_df, baselines_df, sub_ids, session, *, normalize=None) -> ndarray`**
   `flatten_runs` concatenated across every subject in `sub_ids` -- a group's
   whole pixel distribution, pooled (not averaged).
+- **`run_grids(runmap_df, baselines_df, sub_id, session, normalize) -> list[ndarray]`**
+  Each run's own grid (raw or normalized), in run order -- what `mean_grid`
+  averages. Public (not just an internal helper) so a run-level bootstrap can
+  resample which runs go into the mean, with replacement, and refit on each
+  resample (M6, `08_cvd_gamut.ipynb`'s ramp-crossing CI).
+- **`pooled_baseline_values(baselines_df, sub_ids, session, *, trials='all') -> ndarray`**
+  `baseline_values(scope='session')` concatenated across every subject in
+  `sub_ids` -- the baseline analogue of `pooled_pixels`. Always raw: baseline
+  is the normalization's own denominator.
 
 ### Trough location (M2)
 
 - **`trough_location(grid, red_vals, green_vals) -> dict`**
   `{red, green, depth, red_idx, green_idx}` for a grid's minimum (native
   resolution, `np.argmin`).
-- **`subject_troughs(runmap_df, baselines_df, metadata_df, *, normalize=DEFAULT_NORMALIZE, surface_method='paraboloid') -> DataFrame`**
+- **`subject_troughs(runmap_df, baselines_df, metadata_df, *, normalize=DEFAULT_NORMALIZE, surface_method=DEFAULT_SURFACE_METHOD) -> DataFrame`**
   One row per `(sub_id, session)` in `metadata_df`: `sub_id, session, group,
   subgroup, red, green, depth, red_idx, green_idx` (argmin) plus
-  `fitted_red, fitted_green, fitted_depth, fitted_r_squared, fitted_valid`
-  (parametric fit, M4 -- see below).
+  `fitted_red, fitted_green, fitted_depth, fitted_amp, fitted_sigma_red,
+  fitted_sigma_green, fitted_r_squared, fitted_at_bound, fitted_valid`
+  (parametric fit, `surface_method=` default `'ramp_gaussian'`, M4 -- see
+  below) plus `ramp_intercept, ramp_slope_red, ramp_slope_green,
+  ramp_r_squared` (ramp-only fit, M6 -- see below). Unlike the `fitted_*`
+  columns, the `ramp_*` ones are never NaN and don't depend on
+  `fitted_valid`/`fitted_at_bound` -- they're defined for every row.
 - **`group_troughs(runmap_df, baselines_df, metadata_df, sessions, categories, *, normalize=DEFAULT_NORMALIZE) -> DataFrame`**
   One row per `(session, category)` with >=1 subject:
   `label, session, n, red, green, depth, red_idx, green_idx`. `categories` is
@@ -115,25 +129,52 @@ every `permutation.py`/`reliability.py` function below.
     the same `grid`, and pass both results plus `trough_location`'s argmin
     into `plotting.plot_trough_locations` as one `locations` dict (see the
     plotting section below, and `06_trough_surface_fit.ipynb`).
-  - *Get the Gaussian fit into the summary table instead of the paraboloid*
-    -- `subject_troughs(runmap_df, baselines_df, metadata_df,
-    surface_method='gaussian')`. Note this is **not** what's in the
-    persisted `subject_troughs.csv` (that file was built with the default
-    `'paraboloid'` via `scripts/build_troughs.py`) -- call `subject_troughs`
-    yourself with `surface_method='gaussian'` for a fresh DataFrame, or edit
-    `build_troughs.py`'s call if you want the Gaussian version persisted
+  - *Get the paraboloid or Gaussian fit into the summary table instead of the
+    default ramp_gaussian* -- `subject_troughs(runmap_df, baselines_df,
+    metadata_df, surface_method='paraboloid')` (or `'gaussian'`). Note this is
+    **not** what's in the persisted `subject_troughs.csv` (that file was built
+    with the default `'ramp_gaussian'` via `scripts/build_troughs.py`) -- call
+    `subject_troughs` yourself for a fresh DataFrame, or edit
+    `build_troughs.py`'s call if you want a different method persisted
     instead.
   - *Only trust fits that actually converged to a real minimum* -- always
     filter on `fitted_valid` before using `fitted_red`/`fitted_green`/
-    `fitted_depth`: `df[df['fitted_valid']]`. In practice the paraboloid is
-    valid for about 60% of subject/sessions and the Gaussian for about 80%
-    (checked against this project's real data) -- a subject failing one
-    method doesn't necessarily fail the other, so if you need every subject
-    covered, try both and fall back method-by-method rather than dropping
-    the failures outright.
+    `fitted_depth`: `df[df['fitted_valid']]`. `ramp_gaussian` converges
+    (`r_squared` non-NaN) on all 62 subject-sessions in this project's data,
+    but `fit_valid` (a dip deep enough and not pegged at a bound) is a
+    stricter bar -- currently true for CTR/PD but only ~2/8 protan and ~2/7
+    deutan (see `docs/ssvep_analyses.md` proposal 2 and `08_cvd_gamut.ipynb`).
+    For subjects that fail it, `ramp_slope_red` (M6, below) is usually a
+    better fallback than trying another surface-fit method.
   - *Get raw (not baseline-normalized) fitted depth* -- pass `normalize=None`
     to `subject_troughs`, same as `trough_location`'s argmin columns already
     do (see "Trough location" above).
+
+### Ramp-only fit, extrapolation, bootstrap CI (M6)
+
+See `docs/ssvep_analyses.md` proposal 2 and `08_cvd_gamut.ipynb` for the full
+worked analysis; this is the function reference.
+
+- **`fit_ramp(grid, red_vals, green_vals) -> dict`**
+  `{intercept, slope_red, slope_green, r_squared}` -- closed-form linear least
+  squares on `z = c0 + c1*x + c2*y`, no dip term. Has no interior minimum to
+  fail to find, so it's defined for every subject, including ones where
+  `fit_ramp_gaussian` pegs (`at_bound=True`).
+- **`extrapolate_ramp_crossing(ramp, target_depth, green_ref) -> float`**
+  Solves `target_depth = ramp['intercept'] + ramp['slope_red']*red +
+  ramp['slope_green']*green_ref` for `red`. Pass a `target_depth`/`green_ref`
+  derived from subjects whose trough *was* actually located (e.g. the median
+  `fitted_depth`/`fitted_green` among `fitted_valid` subjects of the same
+  subgroup) rather than the pegged subject's own fit -- the result is always
+  extrapolation beyond the sampled range for a pegged subject, and should be
+  labelled as such wherever it's reported, not treated as a measurement.
+- **`bootstrap_ci(replicate_fn, *, n_boot=2000, ci=0.95, seed=0) -> (float, float)`**
+  Generic percentile bootstrap CI. `replicate_fn(rng)` computes and returns
+  one resampled statistic using `rng` for its own resampling (e.g.
+  `rng.choice(arr, size=len(arr), replace=True).mean()` for a proportion's
+  CI, or resampling `run_grids`' output and refitting for a per-subject
+  statistic's CI); called `n_boot` times, NaN replicates dropped before
+  taking percentiles.
 
 ## `plotting.py` -- all figures
 
@@ -179,6 +220,9 @@ by default.
   One box per category, pooled-pixels strategy.
 - **`plot_groups_mean_boxplot(...) -> Axes`**
   One box per category, mean-grid strategy.
+- **`plot_groups_baseline_boxplot(baselines_df, metadata_df, session, categories, *, trials='all') -> Axes`**
+  One box per category, raw baseline trial values pooled across every run and
+  subject (`pooled_baseline_values`) -- always raw, never normalized.
 
 All boxplot/histogram functions use one uniform fill color
 (`DISTRIBUTION_COLOR`) -- category identity is carried by the x-axis tick
@@ -191,6 +235,13 @@ labels, not color.
   `group_troughs` table, one marker **shape** per distinct `label_col` value
   (`'group'` or `'label'`) -- shape rather than color, since a scatter's
   all-pairs color comparisons only stay colorblind-safe up to 3 categories.
+- **`plot_troughs_boxplot(troughs_df, value_col, label_col, *, ylabel=None, ax=None) -> Axes`**
+  One box per distinct `label_col` value in `troughs_df` (a `subject_troughs`
+  table, or anything with that shape), from `troughs_df[value_col]` -- any
+  per-subject scalar feature (e.g. `ramp_slope_red`) against `group`/
+  `subgroup`/a hand-built `label` column. NaNs dropped per category, so a
+  column that's only sometimes defined (like `fitted_red`) still plots
+  cleanly. (M6, `08_cvd_gamut.ipynb`.)
 
 ### Parametric trough surface fit (M4)
 
@@ -412,12 +463,14 @@ edit the variables called out below and rerun from that cell down.
 - **`04_distributions.ipynb`** -- boxplots/histograms of pixel distributions
   (M2): one subject's all-run pixels and mean-grid pixels (raw + %change);
   per-subject boxplots within a group; pooled and mean-of-means boxplots for
-  one group and for several groups side by side; trough summary tables
+  one group and for several groups side by side; a raw baseline comparison
+  across groups (`plot_groups_baseline_boxplot`); trough summary tables
   (`subject_troughs.csv`/`group_troughs.csv`) and a trough-location scatter.
   *Edit:* `SESSION`, `SUB_ID` (single-subject sections), `categories` (group
-  sections), `PERCENT` (or any other `normalize=` dict) -- e.g. swap
-  `PERCENT` for `{'scope': 'session', 'trials': 'first2', 'method': 'zscore'}`
-  to redo every normalized plot with a different normalization strategy.
+  sections, also used by the baseline comparison), `PERCENT` (or any other
+  `normalize=` dict) -- e.g. swap `PERCENT` for `{'scope': 'session', 'trials':
+  'first2', 'method': 'zscore'}` to redo every normalized plot with a
+  different normalization strategy.
 - **`05_permutation_testing.ipynb`** -- cluster-based permutation testing
   (M3), all 3 sophistication levels (`permutation.permutation_test_size` /
   `_weighted` / `_directional`) between group pairs, plus null-distribution
@@ -448,3 +501,13 @@ edit the variables called out below and rerun from that cell down.
   'deutan'` (n=0), and `group='CVD'` (n=2) don't, and `icc_grid` will raise
   a clear `ValueError` naming the problem rather than adding a broken entry
   silently.
+- **`08_cvd_gamut.ipynb`** -- M6, `docs/ssvep_analyses.md` proposal 2:
+  `fitted_at_bound` sensitivity/specificity with a bootstrap CI and a Fisher
+  exact test (CVD vs CTR); `ramp_slope_red` as a measure defined for every CVD
+  subject, boxplotted by subgroup; `extrapolate_ramp_crossing` with a
+  run-level bootstrap CI for pegged subjects, with an explicit caveat about
+  its instability; and the protan-vs-deutan subtype test on both measures
+  (currently not significant at this project's sample size -- see the
+  notebook's section 4 for the numbers). *Edit:* `SESSION` (top cell); the
+  `reference()` function in section 3 to change what pegged subjects'
+  extrapolation targets against.
