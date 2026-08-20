@@ -220,7 +220,10 @@ familiar.
 - `05_permutation_testing.ipynb` — all three permutation tests on `PD`/`protan`/
   `deutan` vs `HC`, with null-distribution histograms
 - `06_trough_surface_fit.ipynb` — paraboloid and gaussian fits overlaid on the
-  grid argmin, plus fit-quality summaries across all 62 subject-sessions
+  grid argmin, plus fit-quality summaries across all 62 subject-sessions.
+  Predates `ramp_gaussian` becoming the default surface method -- doesn't
+  cover it; see `08_cvd_gamut.ipynb` for that fit in use, and `docs/methods.md`
+  for why it replaced these two.
 - `07_test_retest_reliability.ipynb` — ICC maps for the full paired set and per
   group, with Bland-Altman and session-scatter plots at selected pixels
 - `08_cvd_gamut.ipynb` — M6: `fitted_at_bound` as a CVD/CTR diagnostic with a

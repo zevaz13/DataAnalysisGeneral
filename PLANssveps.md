@@ -8,8 +8,8 @@ Reference MATLAB implementations live in `ssveps/templateCode/` (gitignored).
 
 ## Documents
 
-- `docs/ssvep_summary.md` - what has been built, code review findings, and the
-  suggested order of work. **Read this first.**
+- `docs/ssvep_summary.md` - section 1 (what exists) is kept current through
+  M10; sections 2-4 are a dated M1-M5 code review. **Read section 1 first.**
 - `docs/methods.md` - analysis conventions (normalization, axes, ICC, permutation).
 - `docs/api_reference.md` - every public function's signature and parameters.
 - `ssveps/README.md` - data dictionary and script/notebook index.

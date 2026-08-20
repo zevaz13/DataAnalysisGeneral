@@ -87,20 +87,25 @@ subjects/groups -- pass `normalize=None` for raw depth instead.
 `DEFAULT_NORMALIZE` is the same constant `permutation.py`'s and
 `reliability.py`'s functions default to, for the same reason.
 
-## Parametric trough surface fit (M4)
+## Parametric trough surface fit (M4, replaced by ramp_gaussian -- see below)
 
 Grid argmin can only ever land on one of the 100 sampled points, and
 individual subjects are noisy. `analysis.fit_trough_surface(grid, red_vals,
 green_vals, method=)` fits a continuous surface to a grid and locates *that*
-surface's own minimum instead (which can fall between grid points):
+surface's own minimum instead (which can fall between grid points).
+`method='ramp_gaussian'` is the default (`DEFAULT_SURFACE_METHOD`) and the
+one every later milestone (M6-M10) builds on -- see the next section. Two
+earlier methods remain available for comparison:
 
-- `method='paraboloid'` (default) -- `z = a x^2 + b y^2 + c xy + d x + e y +
-  f` via linear least squares (closed-form, no initial guess). More
-  numerically stable given the trough's already-established broad, flat
-  shape (M1).
+- `method='paraboloid'` -- `z = a x^2 + b y^2 + c xy + d x + e y + f` via
+  linear least squares (closed-form, no initial guess). Valid for only
+  ~60% of subject-sessions (37/62) -- a single quadratic term can't
+  represent this data's actual ramp-plus-dip shape (see below), so it often
+  has no interior minimum at all.
 - `method='gaussian'` -- an inverted 2D Gaussian dip via nonlinear least
   squares (`scipy.optimize.curve_fit`), seeded from the grid argmin. More
-  flexible for a sharply localized trough, but can fail to converge.
+  flexible for a sharply localized trough than the paraboloid, but can fail
+  to converge, and has the same one-term-for-two-jobs problem.
 
 Both report `fit_valid` (paraboloid: the Hessian must be positive-definite,
 i.e. a genuine minimum, not a saddle; gaussian: the fitted amplitude must be
@@ -109,10 +114,56 @@ range, not extrapolated) and `r_squared`. **The fitted minimum's *value* is
 often notably higher than the observed grid's minimum pixel** -- expected,
 not a bug: a smooth surface's best-fit vertex doesn't need to coincide with
 the single noisiest/most extreme sampled point, especially for a trough
-that's broad and flat rather than a sharp bowl. `subject_troughs(...,
-surface_method=)` adds this fit's columns (`fitted_red`/`fitted_green`/
-`fitted_depth`/`fitted_r_squared`/`fitted_valid`) alongside the existing
-argmin ones in the same table.
+that's broad and flat rather than a sharp bowl.
+
+## Ramp + Gaussian dip surface fit (M4 replacement, the default since)
+
+`analysis.fit_ramp_gaussian` replaced the paraboloid/Gaussian fits as
+`subject_troughs`' default surface method: `z = c0 + c1*x + c2*y -
+amp*exp(-((x-x0)^2/(2*sx^2) + (y-y0)^2/(2*sy^2)))` -- a linear ramp plus one
+bounded Gaussian dip on top of it, fitted jointly via nonlinear least
+squares. This is the shape the data actually has (SSVEP amplitude falls off
+monotonically with red, and the isoluminant trough is a localized dip on top
+of that decline), which is exactly what the paraboloid/Gaussian fits above
+get wrong by asking one term to represent both the ramp and the dip.
+Converges on 62/62 subject-sessions in this project's data (vs. the
+paraboloid's 37/62), at a higher median r² (0.650 vs. 0.578).
+
+Bounds encode the failure modes directly instead of testing for them
+afterwards: `amp >= 0` (must be a dip, not a bump), the centre must lie
+inside the sampled range (no extrapolation), and the widths are bounded
+below (no degenerate one-pixel spikes) and above (no dip so wide it's just
+re-fitting the ramp). Two distinct quality flags come back, because they
+mean different things:
+
+- **`at_bound`** -- some parameter is pegged against its bound, so the fit
+  is reporting the edge of what the sampled range can express rather than a
+  located dip. Common and physiologically meaningful here: most protan
+  subjects peg `fitted_red` at `max(red_vals)`, i.e. their isoluminant point
+  lies beyond the sampled red range (11/15 CVD subjects at session 1 vs.
+  4/21 CTR, Fisher exact p=0.0019 -- M6, `docs/ssvep_analyses.md` proposal
+  2, `08_cvd_gamut.ipynb`).
+- **`fit_valid`** -- the dip is deep enough to be real (`amp` above
+  `min_snr` times the residual SD, default `min_snr=2.0`) **and** not
+  `at_bound`. Only use `red`/`green`/`amp`/`sigma_red`/`sigma_green` from
+  rows where `fit_valid` is `True` -- currently true for essentially all
+  CTR/PD subjects but only ~2/8 protan and ~2/7 deutan.
+
+Returns `red`/`green` (the dip centre), `depth` (the fitted surface's value
+there), `amp` (dip depth relative to the local ramp -- a scale-free "how
+deep is the trough" measure with no argmin equivalent), `sigma_red`/
+`sigma_green` (dip width per axis, also no argmin equivalent), `r_squared`,
+`at_bound`, `fit_valid`. `subject_troughs(..., surface_method=)` adds
+`fitted_red`/`fitted_green`/`fitted_depth`/`fitted_amp`/`fitted_sigma_red`/
+`fitted_sigma_green`/`fitted_r_squared`/`fitted_at_bound`/`fitted_valid`
+alongside the existing argmin columns in the same table -- these are what
+`fitted_*` refers to everywhere else in this document.
+
+**For subjects that fail `fitted_valid` (most CVD subjects), don't reach
+for a different surface-fit method.** `analysis.fit_ramp` (M6) -- the ramp
+term alone, no dip -- is defined for every subject regardless of fit
+validity, and is the measure this project actually uses for CVD comparisons
+(`ramp_slope_red`; see the M6 section below).
 
 ## Test-retest reliability via per-pixel ICC (M5)
 

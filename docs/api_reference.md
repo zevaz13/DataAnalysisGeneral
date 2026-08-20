@@ -20,6 +20,16 @@ to point it at different subjects/groups/sessions.
   `runmap.csv`, `baselines.csv`. `red_idx`/`green_idx` are 0-based; `run`/
   `trial` are 1-based. Used by both `build_derived.py` and
   `update_derived.py` so their row extraction stays identical.
+- **`write_derived_csv(path: str, df, kind: 'runmap'|'baselines') -> None`**
+  The single writer both `build_derived.py` and `update_derived.py` call, so
+  they produce byte-identical output (2.5 -- see `docs/ssvep_summary.md`):
+  reindexes to the canonical column order for `kind`, sorts by the canonical
+  sort key, and writes with `float_format="%.17g"` (pandas' default
+  formatting doesn't always round-trip float64 exactly; 17 significant
+  digits guarantees it does). Calls `infer_objects()` first, since
+  `float_format` is silently ignored on object-dtype columns -- which is
+  what a DataFrame built by concatenating onto an empty one (`update_derived
+  .py`'s first-run path) leaves `value` as.
 
 ## `analysis.py` -- data access, normalization, aggregation
 
@@ -118,14 +128,44 @@ every `permutation.py`/`reliability.py` function below.
 
 - **`fit_paraboloid(grid, red_vals, green_vals) -> dict`**
   `{red, green, depth, r_squared, fit_valid}` -- closed-form quadratic
-  surface fit; the analytic minimum need not land on a grid point.
+  surface fit; the analytic minimum need not land on a grid point. Valid for
+  only ~60% of subject-sessions in this project's data (a single quadratic
+  term can't represent a ramp-plus-dip surface -- see `fit_ramp_gaussian`).
 - **`fit_gaussian(grid, red_vals, green_vals) -> dict`**
   Same shape, from an inverted 2D Gaussian dip (`scipy.optimize.curve_fit`,
-  seeded from `trough_location`'s argmin).
-- **`fit_trough_surface(grid, red_vals, green_vals, *, method='paraboloid'|'gaussian') -> dict`**
-  Dispatches to one of the above. Call this one directly rather than
-  `fit_paraboloid`/`fit_gaussian` in normal use, so `method` stays a single
-  switch you can flip.
+  seeded from `trough_location`'s argmin). Same ramp-vs-dip limitation as
+  `fit_paraboloid`.
+- **`fit_ramp_gaussian(grid, red_vals, green_vals, *, min_snr=2.0) -> dict`**
+  `{red, green, depth, amp, sigma_red, sigma_green, r_squared, at_bound,
+  fit_valid}` -- **the default surface fit** (`DEFAULT_SURFACE_METHOD`), and
+  the only one of the three that converges on every subject-session in this
+  project's data (62/62 vs. paraboloid's 37/62). Fits a linear ramp *plus* a
+  bounded Gaussian dip on top of it (`z = c0 + c1*x + c2*y - amp*exp(...)`),
+  which is the shape this data actually has -- SSVEP amplitude falls off
+  monotonically with red, and the isoluminant trough is a localized dip
+  sitting on that ramp; `fit_paraboloid`/`fit_gaussian` each ask one term to
+  represent both, which is why they fail so often.
+
+  Two distinct quality flags, because they mean different things:
+  `at_bound` -- some parameter (the dip's centre or width) is pegged against
+  its bound, so the fit is reporting the edge of what the sampled range can
+  express rather than a located dip (common and physiologically meaningful
+  for CVD subjects whose true trough lies beyond the sampled red axis -- M6,
+  `08_cvd_gamut.ipynb`). `fit_valid` -- the dip is deep enough to be real
+  (`amp` above `min_snr` times the residual SD) **and** not `at_bound`. Only
+  trust `red`/`green`/`amp`/`sigma_red`/`sigma_green` from rows where
+  `fit_valid` is `True`; `r_squared` and `depth` are meaningful regardless
+  (see `fit_trough_surface`'s notes below). `amp` (dip depth relative to the
+  local ramp) and `sigma_red`/`sigma_green` (dip width per axis) have no
+  argmin or paraboloid/Gaussian-fit equivalent.
+- **`fit_trough_surface(grid, red_vals, green_vals, *, method=DEFAULT_SURFACE_METHOD) -> dict`**
+  Dispatches to one of the three above (`'ramp_gaussian'` default,
+  `'paraboloid'`, or `'gaussian'`) and normalizes the return schema so every
+  caller sees the same keys regardless of method (`fit_paraboloid`/
+  `fit_gaussian` return `amp`/`sigma_red`/`sigma_green`/`at_bound` as
+  `NaN`/`False` to match). Call this one directly rather than
+  `fit_paraboloid`/`fit_gaussian`/`fit_ramp_gaussian` in normal use, so
+  `method` stays a single switch you can flip.
 
   **How to use this differently:**
   - *Compare both methods on one subject/session* -- call
@@ -582,7 +622,9 @@ edit the variables called out below and rerun from that cell down.
   localization (M4): one subject's argmin vs. paraboloid vs. Gaussian fit,
   overlaid on its heatmap; the ragged 3-run case; fit-quality (`r_squared`)
   and argmin-vs-fitted agreement across every subject/session in
-  `subject_troughs.csv`. *Edit:* the `sub_id` passed to `mean_grid`/
+  `subject_troughs.csv`. Predates `ramp_gaussian` becoming the default
+  surface method, so it isn't covered here -- see `08_cvd_gamut.ipynb` for
+  that fit in use. *Edit:* the `sub_id` passed to `mean_grid`/
   `fit_trough_surface` in the single-subject cells to inspect a different
   subject; `method='paraboloid'|'gaussian'` on any `fit_trough_surface` call.
 - **`07_test_retest_reliability.ipynb`** -- per-pixel ICC(A,1) test-retest

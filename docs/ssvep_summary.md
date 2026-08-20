@@ -1,9 +1,13 @@
 # SSVEP project: work-to-date summary and code review
 
-Covers everything built in `ssveps/` through M1-M5 (see `PLANssveps.md`), plus a
-full read of `scripts/*.py` against the MATLAB templates and the raw data.
-Companion docs: `methods.md` (analysis conventions), `api_reference.md`
-(per-function signatures).
+**Section 1 is kept current** (last updated after M10). **Section 2 is a
+dated code review specifically of the M1-M5 code** (the axis-swap fix, the
+test suite, the permutation subsampling fix, and related findings) -- it was
+not repeated for M6-M10, whose own design decisions and rationale live in
+`docs/methods.md` instead (one section per milestone) rather than as a
+review-style writeup. Companion docs: `methods.md` (analysis conventions and
+per-milestone rationale), `api_reference.md` (per-function signatures),
+`ssvep_analyses.md` (the seven proposed analyses M6-M10 implement).
 
 ## 1. What exists
 
@@ -14,33 +18,55 @@ Raw: 62 `.mat` files in `/home/sebas/data/ssveps/`, 43 unique subjects, sessions
 
 | Script | Role |
 |---|---|
-| `loader.py` | `load_ssvep` (scipy `.mat` -> dict), `to_rows` (one file -> tidy rows) |
+| `loader.py` | `load_ssvep` (scipy `.mat` -> dict), `to_rows` (one file -> tidy rows), `write_derived_csv` (shared writer) |
 | `build_derived.py` | Full from-scratch rebuild of `files/`. Wipes hand-edits. |
 | `update_derived.py` | Incremental add/refresh; preserves `metadata.csv` hand-edits |
 | `build_troughs.py` | Recomputes `subject_troughs.csv` / `group_troughs.csv` |
 
 Derived files in `ssveps/files/`: `metadata.csv` (62 rows), `grid.json`,
-`runmap.csv` (24,200), `baselines.csv` (968), `subject_troughs.csv` (62),
-`group_troughs.csv` (7).
+`runmap.csv` (24,200), `baselines.csv` (968), `subject_troughs.csv` (62 rows,
+now also carrying the M6 ramp-fit columns -- see below), `group_troughs.csv`
+(7). M7/M8/M10's own derived quantities (variance components, gain/shape
+fits, PCA components) are computed fresh in their notebooks, not persisted --
+see `methods.md` for why.
 
 ### Analysis layer
 
-- `analysis.py` (350 lines) - tidy-CSV access, three normalizations
+- `analysis.py` (~590 lines) -- tidy-CSV access, three normalizations
   (percent/db/zscore) over a selectable baseline scope/trial subset,
   single-subject and cross-subject/group aggregation, interpolation, trough
-  argmin, and two parametric surface fits (paraboloid, gaussian).
-- `permutation.py` (307 lines) - three cluster-based permutation tests
+  argmin, four parametric surface fits (paraboloid, gaussian, **ramp_gaussian
+  -- the default since M4's replacement**, and M6's ramp-only `fit_ramp`),
+  M6's `extrapolate_ramp_crossing` and generic `bootstrap_ci`, and M8's
+  `fit_gain_shape`/`trough_region_residual`.
+- `permutation.py` (307 lines) -- three cluster-based permutation tests
   mirroring the three MATLAB templates: size-only, size+weight, and
   positive/negative directional.
-- `reliability.py` (128 lines) - paired-subject discovery, per-pixel ICC(A,1)
-  grid via `pingouin`, session-pair extraction, and two example-point selectors.
-- `plotting.py` (759 lines, 37 functions) - heatmaps, distributions, trough
-  scatter/overlay, permutation panels, ICC maps, Bland-Altman/session scatter.
+- `reliability.py` (~170 lines) -- paired-subject discovery, per-pixel
+  ICC(A,1) grid via `pingouin`, session-pair extraction, two example-point
+  selectors, and M9's `feature_icc`/`minimum_detectable_effect` (per-subject
+  scalar reliability and the ICC-to-power connection).
+- `variance.py` (M7, new module) -- within/between-subject variance
+  decomposition via a random-intercept `statsmodels` `MixedLM` per group,
+  plus a subject-level bootstrap CI on each component.
+- `pca.py` (M10, new module) -- PCA (plain SVD, no covariance shrinkage) of
+  the 100-cell response grid, plus permutation-based component-count
+  selection (a numpy-native alternative to a fixed cutoff or shrinkage
+  covariance).
+- `plotting.py` (~800 lines, 40 functions) -- heatmaps, distributions
+  (including M6's baseline-comparison and M6/M9's generic per-feature
+  boxplot), trough scatter/overlay, permutation panels, ICC maps,
+  Bland-Altman/session scatter.
 
 ### Notebooks
 
 `01_explore`, `02_plots`, `03_group_comparisons`, `04_distributions`,
-`05_permutation_testing`, `06_trough_surface_fit`, `07_test_retest_reliability`.
+`05_permutation_testing`, `06_trough_surface_fit`, `07_test_retest_reliability`
+(M1-M5), then `08_cvd_gamut`, `09_variance_components`, `10_gain_shape`,
+`11_reliability_outcomes`, `12_pca` (M6-M10). `08`-`12` each include an
+"Understanding ..." section per method with a synthetic-data walkthrough
+before the real analysis -- read those first if the underlying statistics
+aren't already familiar (see `ssveps/README.md`).
 
 ### Headline results so far
 
@@ -51,6 +77,29 @@ Derived files in `ssveps/files/`: `metadata.csv` (62 rows), `grid.json`,
 - Test-retest ICC: 0.77 across the whole grid (n=19 paired), 0.79 for CTR
   (n=13), 0.42 for PD (n=4, too thin to trust). CVD subgroups have too few
   paired subjects to run at all.
+- **CVD vs. CTR is the one well-powered effect in the dataset** (M6):
+  73%/81% sensitivity/specificity on whether a subject's trough fit pegs at
+  the sampled range boundary (Fisher exact p=0.0019). The protan-vs-deutan
+  subtype question has a consistent hint across three independent
+  analyses -- shallower `ramp_slope_red` (M6), a trough-specific residual
+  beyond gain (M8, p=0.030 uncorrected), the closest-to-significant PC1
+  split (M10, p=0.092) -- but none individually reaches significance at
+  n=7-8.
+- **PD's higher variability is about the people, not the measurement** (M7):
+  within-subject SD is not elevated, but whether PD's between-subject SD
+  exceeds CTR's remains unresolved at n=6. Deutan's between-subject SD came
+  out *lower* than CTR's -- unexpected, flagged rather than explained away.
+- **Reliability-first outcome selection changed the recommendation** (M9):
+  `ramp_slope_red` (M6) and `gain` (M8) are *more* reliable (ICC 0.85, 0.90)
+  than `depth` (0.76, the original top pick); `fitted_red` (0.18) is
+  functionally unusable at this project's sample sizes.
+- **PCA confirms "gain" as the dominant real axis** (M10) three independent
+  ways (PC1, `ramp_intercept`, `gain` all correlate >0.9), and only PC1
+  clears a permutation-based noise floor at n=43 -- stricter than originally
+  expected.
+- The standing experimental recommendation since M6, unchanged: extend the
+  red stimulus axis, and collect more PD/protan/deutan subjects. See
+  `PLANssveps.md`'s "M6-M10: where this leaves things" for the full picture.
 
 ## 2. Findings
 
@@ -350,7 +399,10 @@ Stated explicitly so it does not get re-litigated:
   warranted.
 - No unused imports in any of the eight scripts.
 
-## 4. Suggested order of work
+## 4. Suggested order of work (historical -- all items below are done)
+
+For current, forward-looking guidance see `PLANssveps.md`'s "M6-M10: where
+this leaves things" section instead.
 
 1. Fix the axis swap (2.1) and rebuild the derived CSVs. Everything trough- and
    pixel-location-related is wrong until this lands.

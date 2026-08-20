@@ -2,8 +2,10 @@ The data in /home/sebas/data/manualTest includes results for the behavioral (man
 
 ## Documents
 
-- `beh/README.md` -- data dictionary and function reference (loader,
-  plotting, comparisons). **Read this first.**
+- `beh/README.md` -- data dictionary and script/notebook index. **Read this
+  first.**
+- `docs/beh_api_reference.md` -- every function's signature and parameters
+  (loader, plotting, comparisons).
 
 ## Decisions made while implementing M1
 
