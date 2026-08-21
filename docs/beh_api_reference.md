@@ -59,6 +59,49 @@ identity in hue -- see `beh/README.md`.
   One panel per category, each a `plot_subjects_pooled` call. `categories`
   is a list of `{"label", "group", "subgroup"}` dicts, the same shape as
   `ssveps/scripts/plotting.py`'s function of the same name.
+- **`plot_feature_space(df, categories, *, x_feature='orientation_deg', y_feature='perp_var', ax=None) -> Axes`**
+  M2: one subject-level point per category, in shape-feature space
+  (`features.subject_shape_features`'s keys). `categories` is the same
+  `{"label", "group", "subgroup"}` shape as `plot_groups_side_by_side`, but
+  overlaid by hue on one panel (like `plot_subject_sessions`) rather than
+  faceted -- capped at `len(SESSION_COLORS)` (3) categories, the dataviz
+  skill's all-pairs scatter color limit; raises `ValueError` past that.
+
+`plot_subject_cloud` and `plot_subjects_grid` additionally take
+`show_fit: bool = False` (M2) -- overlays each subject's fitted PCA line
+(`features.subject_pca_line`), in `FIT_LINE_COLOR` (secondary ink, since
+it's a derived overlay, not a data series).
+
+## `features.py` -- PCA shape features and per-feature comparisons (M2)
+
+Complements `comparisons.py`: instead of comparing groups' (red, green)
+*means*, this fits a PCA line to each subject's own pooled clicks and
+compares groups on the shape of that fit.
+
+- **`subject_shape_features(df, sub_id) -> dict`**
+  PCA on one subject's pooled (red, green) clicks (every session). Returns
+  `{orientation_deg, along_var, perp_var, n}` -- `orientation_deg` is the
+  first principal component's angle, folded into `[0, 180)` since a line has
+  no direction; `along_var` is the along-line spread (PC1 variance);
+  `perp_var` is the off-line scatter (PC2 variance, i.e. match consistency).
+  Raises `ValueError` if the subject has fewer than 2 points.
+- **`subject_pca_line(df, sub_id) -> (ndarray, ndarray)`**
+  The two endpoints of the fitted PCA line, spanning that subject's actual
+  data extent along PC1 -- for `plotting.py`'s `show_fit` overlay.
+- **`group_features(df, *, group=None, subgroup=None) -> DataFrame`**
+  `subject_shape_features` for every subject in a group/subgroup, one row
+  per subject (indexed by `sub_id`).
+- **`compare_shape_feature(df, feature, *, group1=None, subgroup1=None, group2=None, subgroup2=None) -> dict`**
+  Mann-Whitney U test + effect size (`pingouin.mwu`) on one feature between
+  two groups/subgroups. `feature` is one of `subject_shape_features`'s keys.
+  Returns `{feature, u_val, p_value, rbc, cles, n1, n2}` -- `rbc` (rank-
+  biserial correlation) and `cles` (common language effect size) come
+  straight from pingouin. Chosen over a multivariate test (e.g. 3D Hotelling
+  T²) because it's per-feature (shows which shape property drives a
+  difference) and doesn't assume the small protan/deutan samples are
+  Gaussian. Note: orientation comparisons assume a group's angles don't
+  straddle the 0/180 wrap point -- true for this dataset (see `features.py`
+  module docstring) but not a general circular-safe statistic.
 
 ## `comparisons.py` -- Hotelling T² group comparisons
 
@@ -124,3 +167,9 @@ Each opens with `sys.path.append('../scripts')`, so run them with
   protan vs. deutan (p=0.004, n=8 vs 7). *Edit:* the `some_subjects` list
   (arbitrary-selection section) and `comparison_specs` (the five
   comparisons) to look at different subjects/groups.
+- **`02_shape_features.ipynb`** -- M2: fitted-line overlays
+  (`plot_subjects_grid(..., show_fit=True)`) for the protan/deutan grids;
+  a feature-space scatter (`plot_feature_space`); and the same five group
+  comparisons as M1, run via `compare_shape_feature` on each of
+  `orientation_deg`, `along_var`, `perp_var`. *Edit:* `comparison_specs`
+  (shared with `01_explore.ipynb`'s list) to look at different group pairs.

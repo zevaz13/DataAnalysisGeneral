@@ -21,10 +21,12 @@ uses for its boxplots.
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from features import group_features, subject_pca_line
 from loader import subjects_in_group
 
 POINT_COLOR = "#2a78d6"
 SESSION_COLORS = ["#2a78d6", "#eb6834", "#1baf7a"]  # validated all-pairs for scatter, up to 3 categories
+FIT_LINE_COLOR = "#52514e"  # secondary ink, not a categorical slot: this is a derived overlay, not a series
 XLIM = (0, 3200)
 YLIM = (0, 2000)
 
@@ -89,15 +91,26 @@ def plot_subject_sessions(
 
 
 def plot_subject_cloud(
-    df: pd.DataFrame, sub_id: str, *, xlim: tuple[float, float] = XLIM, ylim: tuple[float, float] = YLIM, ax: plt.Axes | None = None
+    df: pd.DataFrame,
+    sub_id: str,
+    *,
+    xlim: tuple[float, float] = XLIM,
+    ylim: tuple[float, float] = YLIM,
+    show_fit: bool = False,
+    ax: plt.Axes | None = None,
 ) -> plt.Axes:
     """Scatter of every click from every session of one subject, pooled into
     a single color -- the whole-subject point cloud, session distinctions
-    dropped."""
+    dropped. show_fit=True overlays that subject's fitted PCA line
+    (features.subject_pca_line), spanning the actual data extent along the
+    first principal component (M2 -- see features.py)."""
     sub = df[df["sub_id"] == sub_id]
     if ax is None:
         _, ax = plt.subplots()
     ax.scatter(sub["red"], sub["green"], color=POINT_COLOR, alpha=0.7, edgecolor="white")
+    if show_fit:
+        p1, p2 = subject_pca_line(df, sub_id)
+        ax.plot([p1[0], p2[0]], [p1[1], p2[1]], color=FIT_LINE_COLOR, linewidth=2, linestyle="--")
     _style_axes(ax, xlim=xlim, ylim=ylim, title=f"{sub_id} (n={len(sub)}, all sessions)")
     return ax
 
@@ -136,17 +149,19 @@ def plot_subjects_grid(
     subgroup: str | None = None,
     xlim: tuple[float, float] = XLIM,
     ylim: tuple[float, float] = YLIM,
+    show_fit: bool = False,
 ) -> plt.Figure:
     """One panel per subject (that subject's whole point cloud, every
     session pooled), wrapped to at most MAX_PANEL_COLS per row -- "all on a
     grid (max 5 participants per row)" (PLANbeh.md M1). Pass sub_ids for an
     arbitrary hand-picked set of subjects side by side instead of a
-    group/subgroup filter."""
+    group/subgroup filter. show_fit=True overlays each subject's fitted PCA
+    line (see plot_subject_cloud)."""
     if sub_ids is None:
         sub_ids = subjects_in_group(df, group=group, subgroup=subgroup)
     fig, axes = _multi_panel_figure(len(sub_ids))
     for ax, sub_id in zip(axes, sub_ids):
-        plot_subject_cloud(df, sub_id, xlim=xlim, ylim=ylim, ax=ax)
+        plot_subject_cloud(df, sub_id, xlim=xlim, ylim=ylim, show_fit=show_fit, ax=ax)
     subtitle = ", ".join(filter(None, [group, subgroup])) or f"{len(sub_ids)} subjects"
     fig.suptitle(subtitle)
     fig.tight_layout()
@@ -166,3 +181,28 @@ def plot_groups_side_by_side(
         ax.set_title(cat["label"] + "\n" + ax.get_title())
     fig.tight_layout()
     return fig
+
+
+def plot_feature_space(
+    df: pd.DataFrame, categories: list[dict], *, x_feature: str = "orientation_deg", y_feature: str = "perp_var", ax: plt.Axes | None = None
+) -> plt.Axes:
+    """One subject-level point per category in shape-feature space (M2,
+    features.subject_shape_features) -- x_feature/y_feature name one of its
+    keys ('orientation_deg', 'along_var', 'perp_var'). categories is the
+    same {"label", "group", "subgroup"} shape as plot_groups_side_by_side,
+    capped at len(SESSION_COLORS): like plot_subject_sessions, this overlays
+    series by hue on one panel, so it inherits the dataviz skill's all-pairs
+    scatter color limit (only the first three categorical slots are
+    colorblind-safe once every pair of marks can sit side by side) -- past
+    that, call it multiple times or facet instead."""
+    if len(categories) > len(SESSION_COLORS):
+        raise ValueError(f"plot_feature_space supports at most {len(SESSION_COLORS)} categories (scatter all-pairs color limit), got {len(categories)}")
+    if ax is None:
+        _, ax = plt.subplots()
+    for cat, color in zip(categories, SESSION_COLORS):
+        feats = group_features(df, group=cat.get("group"), subgroup=cat.get("subgroup"))
+        ax.scatter(feats[x_feature], feats[y_feature], color=color, alpha=0.8, edgecolor="white", label=f"{cat['label']} (n={len(feats)})")
+    ax.set_xlabel(x_feature)
+    ax.set_ylabel(y_feature)
+    ax.legend(fontsize=8)
+    return ax

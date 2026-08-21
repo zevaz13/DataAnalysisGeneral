@@ -57,6 +57,10 @@ Raw column -> tidy column, renamed for consistency with `ssveps/`'s naming:
   `unit='point'` (pooled clicks, pseudoreplicated but shows point-cloud
   shape) is a parameter, not a fixed choice -- see
   `docs/beh_api_reference.md`.
+- `scripts/features.py` -- M2: per-subject shape features (PCA on each
+  subject's pooled clicks -- line orientation, spread along it, scatter off
+  it) and per-feature group comparisons (Mann-Whitney U + effect size, via
+  `pingouin`), complementing `comparisons.py`'s mean-only Hotelling T².
 
 ## Tests
 
@@ -82,3 +86,7 @@ Each opens with `sys.path.append('../scripts')`, so run them with
   and the `unit=` choice; and the five group comparisons `PLANbeh.md` M1
   asks for. All five are significant at the subject level, including protan
   vs. deutan (p=0.004, n=8 vs 7).
+- `02_shape_features.ipynb` -- M2: PCA-derived shape features per subject
+  (orientation, along-line spread, perpendicular tightness); fitted-line
+  overlays and a feature-space scatter; the same five group comparisons as
+  M1, run per feature instead of on the mean.

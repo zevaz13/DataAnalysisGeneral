@@ -75,6 +75,53 @@ direct measure of the perceptual judgment than an indirect neural
 correlate. Worth tracking as both datasets develop in parallel -- this task
 may resolve some of what the SSVEP measures are still underpowered for.
 
+### M2 Shape features and comparisons
+
+**Aim:** M1 already found every group pair significant on subject-mean
+location alone, including protan vs. deutan (p=0.0042) -- more clearly than
+SSVEP's own `ramp_slope_red` subtype comparison (p=0.44). M2 goes past the
+mean to ask whether the *shape* of a subject's point cloud (not just its
+center) sharpens that split further, since protan and deutan clouds were
+noted as each tracing a fairly uniform line rather than a blob.
+
+- [x] Shape features (`beh/scripts/features.py`) -- PCA on each subject's
+  pooled (red, green) clicks, giving three features per subject:
+  `orientation_deg` (angle of the fitted line, folded to [0, 180)),
+  `along_var` (spread along the line), `perp_var` (scatter off the line --
+  match consistency). `group_features` collects these per group/subgroup.
+- [x] Plotting (`beh/scripts/plotting.py`) -- `show_fit=True` on
+  `plot_subject_cloud`/`plot_subjects_grid` overlays each subject's fitted
+  PCA line; `plot_feature_space` scatters subjects in shape-feature space
+  (e.g. orientation vs. perp_var), colored by group/subgroup, capped at 3
+  categories per the dataviz skill's all-pairs scatter color limit.
+- [x] Comparisons (`features.compare_shape_feature`) -- Mann-Whitney U +
+  effect size (pingouin) per feature, since n=7-8 for protan/deutan is small
+  and orientation isn't safely Gaussian. Not a single omnibus stat like
+  Hotelling T^2 -- run once per feature to see which shape property (if any)
+  drives a given group difference.
+- [x] Run the same five group comparisons as M1 (HC vs PD, HC vs CVD, HC vs
+  protan, HC vs deutan, protan vs deutan) on all three shape features in
+  `beh/notebooks/02_shape_features.ipynb`.
+
+**`orientation_deg` separates protan from deutan perfectly** (p=0.0003,
+rank-biserial=1.0, common-language effect size=1.0 -- every protan
+subject's line orientation falls on one side of every deutan subject's).
+Cleaner than M1's mean-location Hotelling T² on the same groups (p=0.004),
+and far cleaner than SSVEP's `ramp_slope_red` (p=0.44) -- the line's
+*direction* carries more subtyping signal than its *position*. `along_var`
+trends the same direction (p=0.07) but isn't significant at n=8,7.
+`perp_var` (match consistency) doesn't separate any group pair in this
+dataset -- HC vs PD is the only borderline case on any shape feature
+(p=0.03), everything else involving CVD subtypes is far from significant.
+Worth checking whether an orientation/direction-style feature can be
+extracted from the SSVEP gamut data too, as it may outperform
+`ramp_slope_red` there the same way.
+
+## M3. other
+
+- [ ] make a plot for centroids, per subject, and groups. The one per subject, please color code the grorups. 
+- [ ] Do the same type of plot for all the new features. 
+
 ## Next milestones
 
 To be defined together.

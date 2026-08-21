@@ -22,6 +22,7 @@ for _name in ("loader", "plotting"):
     sys.modules.pop(_name, None)
 
 import comparisons  # noqa: E402
+import features  # noqa: E402
 import loader  # noqa: E402
 import plotting  # noqa: E402
 
@@ -129,6 +130,64 @@ def test_compare_groups_point_unit_pseudoreplicates_toward_significance(df):
     assert point_result["p_value"] <= subject_result["p_value"]
 
 
+# --- features (PCA shape, M2) --------------------------------------------
+
+
+def test_subject_shape_features_returns_expected_keys(df):
+    feat = features.subject_shape_features(df, "MET001")
+    assert set(feat) == {"orientation_deg", "along_var", "perp_var", "n"}
+    assert feat["along_var"] >= feat["perp_var"]
+    assert feat["n"] == len(df[df["sub_id"] == "MET001"])
+
+
+def test_subject_shape_features_orientation_is_folded_to_0_180(df):
+    for sub_id in loader.subjects_in_group(df)[:10]:
+        feat = features.subject_shape_features(df, sub_id)
+        assert 0 <= feat["orientation_deg"] < 180
+
+
+def test_subject_shape_features_raises_for_fewer_than_two_points():
+    synth = pd.DataFrame({"sub_id": ["A1"], "red": [500], "green": [500]})
+    with pytest.raises(ValueError):
+        features.subject_shape_features(synth, "A1")
+
+
+def test_subject_pca_line_endpoints_span_projected_extent(df):
+    """p1/p2 are the subject's own most-extreme points projected onto the
+    fitted line -- every point should project inside [p1, p2], none beyond."""
+    p1, p2 = features.subject_pca_line(df, "MET001")
+    points = df.loc[df["sub_id"] == "MET001", ["red", "green"]].to_numpy()
+    direction = (p2 - p1) / np.linalg.norm(p2 - p1)
+    proj = (points - p1) @ direction
+    assert proj.min() >= -1e-6
+    assert proj.max() <= np.linalg.norm(p2 - p1) + 1e-6
+
+
+def test_group_features_one_row_per_subject(df):
+    sub_ids = loader.subjects_in_group(df, subgroup="protan")
+    feats = features.group_features(df, subgroup="protan")
+    assert list(feats.index) == sub_ids
+    assert set(feats.columns) == {"orientation_deg", "along_var", "perp_var", "n"}
+
+
+def test_compare_shape_feature_detects_a_known_separation():
+    """Group A: points scattered tightly off a horizontal line (small
+    perp_var). Group B: same line, much noisier off-line scatter (large
+    perp_var). compare_shape_feature on 'perp_var' should reject the null."""
+    rng = np.random.default_rng(0)
+    n_subjects, n_points = 10, 20
+    rows = []
+    for group, perp_sd in [("A", 5), ("B", 80)]:
+        for i in range(n_subjects):
+            along = rng.normal(0, 200, n_points)
+            perp = rng.normal(0, perp_sd, n_points)
+            rows.append(pd.DataFrame({"sub_id": f"{group}{i}", "red": 1000 + along, "green": 1000 + perp, "group": group, "subgroup": "NA"}))
+    synth = pd.concat(rows, ignore_index=True)
+    result = features.compare_shape_feature(synth, "perp_var", group1="A", group2="B")
+    assert result["p_value"] < 0.001
+    assert result["n1"] == n_subjects and result["n2"] == n_subjects
+
+
 # --- plotting ------------------------------------------------------------
 
 
@@ -158,3 +217,25 @@ def test_plot_groups_side_by_side_one_panel_per_category(df):
     categories = [{"label": "HC", "group": "CTR"}, {"label": "PD", "group": "PD"}]
     fig = plotting.plot_groups_side_by_side(df, categories)
     assert len(fig.axes) == len(categories)
+
+
+def test_plot_subject_cloud_show_fit_adds_a_line(df):
+    ax = plotting.plot_subject_cloud(df, "MET001", show_fit=True)
+    assert len(ax.lines) == 1
+
+
+def test_plot_feature_space_rejects_more_categories_than_session_colors(df):
+    categories = [
+        {"label": "HC", "group": "CTR"},
+        {"label": "PD", "group": "PD"},
+        {"label": "CVD", "group": "CVD"},
+        {"label": "protan", "subgroup": "protan"},
+    ]
+    with pytest.raises(ValueError):
+        plotting.plot_feature_space(df, categories)
+
+
+def test_plot_feature_space_one_series_per_category(df):
+    categories = [{"label": "HC", "group": "CTR"}, {"label": "PD", "group": "PD"}]
+    ax = plotting.plot_feature_space(df, categories)
+    assert len(ax.collections) == len(categories)
