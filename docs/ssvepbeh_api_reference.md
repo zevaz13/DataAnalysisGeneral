@@ -45,6 +45,58 @@ function takes already-loaded DataFrames (`beh_df`, `runmap_df`,
   behavioral centroid (mean red/green across every click) and their EEG
   trough location (`analysis.trough_location`'s argmin). Returns
   `{beh_red, beh_green, eeg_red, eeg_green, distance}`.
+- **`click_value_test(B, E, *, n_perm=5000, seed=None) -> dict`**
+  A second, differently-constructed spatial test: is the EEG value *at*
+  cells actually clicked lower than a null of the same number of clicks
+  landing on uniformly random cells (no toroidal shift -- click position
+  structure is discarded entirely)? Returns `{p_value, obs_mean,
+  null_means}`, `obs_mean = sum(E*B)/B.sum()`. Deliberately a different null
+  model from `weighted_overlap_test`, so their agreement is corroborating
+  evidence, not the same test twice.
+- **`subject_click_value_test(...)` / `group_click_value_test(...)`**
+  `click_value_test` versions of `subject_overlap`/`group_overlap` -- same
+  signatures, same `B`/`E` construction (`_subject_grids`/`_group_grids`,
+  shared internally with the `weighted_overlap_test` wrappers), different
+  test.
+
+Both permutation tests use the `(1 + count) / (1 + n_perm)` p-value
+correction -- `docs/ssvep_summary.md` finding 2.7 flagged this as still
+missing in `ssveps/scripts/permutation.py` itself; a permutation p-value
+can never legitimately be exactly 0 (the observed arrangement is itself one
+of the `n_perm + 1` possible arrangements under the null).
+
+## `correlation.py` -- individual-differences convergent validity
+
+Complements `overlap.py`'s spatial tests with a different question: not
+"do clicks land where EEG is low" but "does a subject's EEG-derived
+severity track their behavioral severity, relative to other subjects." EEG
+features come from `ssveps/files/subject_troughs.csv` (read directly, the
+same reuse-not-rebuild convention `beh/`/`standardizedScores/FM100/` use for
+`ssveps/files/metadata.csv`), not recomputed -- `ramp_slope_red`/
+`ramp_slope_green`/`ramp_intercept` are always defined (ssveps' M9: its most
+reliable outcomes; `ramp_intercept` correlates r=-0.93 with M8's `gain`, so
+it stands in for `gain` without that pipeline's CTR-template dependency),
+unlike `fitted_red`/`green`/`depth`, NaN for roughly half of CVD subjects.
+
+- **`DEFAULT_BEH_FEATURES`** = `["beh_red", "beh_green", "orientation_deg", "along_var", "perp_var"]`,
+  **`DEFAULT_EEG_FEATURES`** = `["eeg_red", "eeg_green", "ramp_slope_red", "ramp_slope_green", "ramp_intercept"]`
+- **`subject_features_table(beh_df, session, *, subject_troughs_path=SUBJECT_TROUGHS_PATH) -> DataFrame`**
+  One row per subject present in both `beh_df` and the EEG trough table at
+  `session`: `sub_id, group, subgroup` plus every `DEFAULT_BEH_FEATURES`/
+  `DEFAULT_EEG_FEATURES` column. Behavioral features come from that
+  subject's pooled clicks across every session (beh has no session-level
+  structure that corresponds to the EEG's) via `beh/scripts/features.py`'s
+  `subject_shape_features`, plus an inline centroid mean.
+- **`feature_correlations(table, *, beh_features=DEFAULT_BEH_FEATURES, eeg_features=DEFAULT_EEG_FEATURES, group=None, subgroup=None, method='spearman') -> DataFrame`**
+  `pingouin.corr` between every `beh_features` x `eeg_features` pair in
+  `table`, optionally filtered to one group/subgroup first. Returns a tidy
+  long table: `beh_feature, eeg_feature, r, p_value, n, group, subgroup`
+  (`'all'` where unfiltered). `method='spearman'` default (robust to the
+  small, possibly-nonlinear per-group samples here, same reasoning as M2's
+  Mann-Whitney choice); pass `method='pearson'` for a linear-only check.
+  **Not corrected for multiple comparisons** -- with 25 pairs in the default
+  feature sets, treat any single result as exploratory unless corrected
+  first (see `01_explore.ipynb`'s "Is this analysis enough?" section).
 
 ## `plotting.py` -- overlap visualization
 
@@ -58,10 +110,14 @@ function takes already-loaded DataFrames (`beh_df`, `runmap_df`,
 
 ## Notebooks
 
-- **`01_explore.ipynb`** -- M1: one participant's EEG-vs-behavioral
-  overlap (`plot_overlap`, `subject_overlap`); group overlap for
-  HC/PD/CVD/protan/deutan (`group_overlap`, every group p<0.05); a
-  centroid-distance table by group (`centroid_distance`); suggested further
-  methods (not built in this pass) for testing the beh-EEG relationship
-  differently. *Edit:* `session` (top cell), `categories` (group-overlap
-  section) to look at different group pairs/sessions.
+- **`01_explore.ipynb`** -- M1: one participant's EEG-vs-behavioral overlap
+  (`plot_overlap`, `subject_overlap`); group overlap for all five
+  categories on both `weighted_overlap_test` and `click_value_test` (every
+  group significant on both); EEG-vs-behavioral-density heatmaps for all
+  five groups (not just HC); a centroid-distance table by group
+  (`centroid_distance`); the individual-differences correlation analysis
+  (`correlation.py`), pooled and per-group/subtype; a critical "is this
+  analysis enough" assessment; suggested further methods not built this
+  pass (cross-session reliability, multiple-comparisons correction).
+  *Edit:* `session` (top cell), `categories` (top cell) to look at
+  different group pairs/sessions.

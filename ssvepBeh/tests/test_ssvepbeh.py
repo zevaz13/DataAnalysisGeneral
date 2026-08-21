@@ -48,6 +48,7 @@ sys.path.remove(str(SCRIPTS))
 sys.path.insert(0, str(SCRIPTS))
 sys.modules.pop("plotting", None)
 import plotting  # noqa: E402
+import correlation  # noqa: E402 -- inserts beh/scripts and imports "features" (unique name), no further defense needed
 
 analysis = overlap.analysis  # ssveps/scripts/analysis.py, already imported by overlap
 
@@ -198,6 +199,114 @@ def test_centroid_distance_returns_expected_keys(beh_df, runmap_df, baselines_df
     result = overlap.centroid_distance(beh_df, runmap_df, baselines_df, "MET001", 1)
     assert set(result) == {"beh_red", "beh_green", "eeg_red", "eeg_green", "distance"}
     assert result["distance"] >= 0
+
+
+# --- click_value_test (a genuinely different null model from weighted_overlap_test) ----
+
+
+def test_click_value_test_obs_mean_matches_manual_formula(beh_df, runmap_df, baselines_df):
+    sub_id, session = "MET001", 1
+    B = overlap.behavioral_density_map(beh_df, [sub_id])
+    E = analysis.mean_grid(runmap_df, baselines_df, sub_id, session, normalize=analysis.DEFAULT_NORMALIZE)
+    result = overlap.click_value_test(B, E, n_perm=100, seed=0)
+    expected_obs_mean = float(np.sum(E * B) / B.sum())
+    assert result["obs_mean"] == pytest.approx(expected_obs_mean)
+
+
+def test_click_value_test_is_reproducible_under_a_seed(beh_df, runmap_df, baselines_df):
+    sub_id, session = "MET001", 1
+    B = overlap.behavioral_density_map(beh_df, [sub_id])
+    E = analysis.mean_grid(runmap_df, baselines_df, sub_id, session, normalize=analysis.DEFAULT_NORMALIZE)
+    r1 = overlap.click_value_test(B, E, n_perm=200, seed=42)
+    r2 = overlap.click_value_test(B, E, n_perm=200, seed=42)
+    np.testing.assert_array_equal(r1["null_means"], r2["null_means"])
+
+
+def test_click_value_test_rejects_mismatched_shapes():
+    with pytest.raises(ValueError):
+        overlap.click_value_test(np.ones((10, 10)), np.ones((5, 5)))
+
+
+def test_click_value_test_rejects_empty_behavioral_map():
+    with pytest.raises(ValueError):
+        overlap.click_value_test(np.zeros((10, 10)), np.ones((10, 10)))
+
+
+def test_click_value_test_detects_a_known_relationship():
+    """All clicks in a cell where E is 0, everywhere else E is 10 -- the
+    null (uniform random cells) should almost never draw all-zero, so
+    p should be small. Different null-construction from
+    test_weighted_overlap_test_detects_a_known_overlap (random cells vs.
+    toroidal shift) on the same synthetic B/E, as a cross-check the two
+    methods agree."""
+    B = np.zeros((10, 10))
+    B[0, 0] = 100
+    E = np.ones((10, 10)) * 10
+    E[0, 0] = 0
+    result = overlap.click_value_test(B, E, n_perm=2000, seed=0)
+    assert result["obs_mean"] == 0
+    assert result["p_value"] < 0.05
+
+
+def test_subject_click_value_test_runs_end_to_end(beh_df, runmap_df, baselines_df):
+    result = overlap.subject_click_value_test(beh_df, runmap_df, baselines_df, "MET001", 1, n_perm=200, seed=0)
+    assert {"p_value", "obs_mean", "null_means"}.issubset(result)
+
+
+def test_group_click_value_test_reports_n(beh_df, runmap_df, baselines_df, metadata_df):
+    result = overlap.group_click_value_test(beh_df, runmap_df, baselines_df, metadata_df, 1, group="CTR", n_perm=200, seed=0)
+    expected_n = len(analysis.subjects_in_group(metadata_df, 1, group="CTR"))
+    assert result["n_subjects"] == expected_n
+
+
+# --- correlation (individual-differences convergent validity) --------------
+
+
+def test_subject_features_table_has_expected_columns(beh_df):
+    table = correlation.subject_features_table(beh_df, session=1)
+    expected_cols = {"sub_id", "group", "subgroup", "beh_red", "beh_green", "orientation_deg", "along_var", "perp_var", "eeg_red", "eeg_green", "ramp_slope_red", "ramp_slope_green", "ramp_intercept"}
+    assert expected_cols.issubset(table.columns)
+    assert len(table) > 0
+    assert table["sub_id"].is_unique
+
+
+def test_subject_features_table_only_includes_subjects_in_both_datasets(beh_df):
+    table = correlation.subject_features_table(beh_df, session=1)
+    troughs = pd.read_csv(correlation.SUBJECT_TROUGHS_PATH)
+    eeg_sub_ids = set(troughs.loc[troughs["session"] == 1, "sub_id"])
+    beh_sub_ids = set(beh_df["sub_id"])
+    assert set(table["sub_id"]) == beh_sub_ids & eeg_sub_ids
+
+
+def test_feature_correlations_detects_a_known_relationship():
+    """Synthetic table with a perfect linear relationship between one beh
+    and one eeg feature -- Spearman correlation should find it (r close to
+    1, p small), everything else built from independent noise shouldn't
+    reliably.."""
+    rng = np.random.default_rng(0)
+    n = 30
+    beh_red = rng.normal(0, 1, n)
+    table = pd.DataFrame(
+        {
+            "group": ["CTR"] * n,
+            "subgroup": ["NA"] * n,
+            "beh_red": beh_red,
+            "beh_green": rng.normal(0, 1, n),
+            "eeg_red": beh_red * 2 + 100,  # perfectly monotonic in beh_red
+            "eeg_green": rng.normal(0, 1, n),
+        }
+    )
+    result = correlation.feature_correlations(table, beh_features=["beh_red", "beh_green"], eeg_features=["eeg_red", "eeg_green"])
+    matched = result[(result["beh_feature"] == "beh_red") & (result["eeg_feature"] == "eeg_red")].iloc[0]
+    assert matched["r"] == pytest.approx(1.0)
+    assert matched["p_value"] < 1e-6
+
+
+def test_feature_correlations_filters_by_group(beh_df):
+    table = correlation.subject_features_table(beh_df, session=1)
+    result = correlation.feature_correlations(table, group="CTR")
+    assert (result["group"] == "CTR").all()
+    assert result["n"].iloc[0] == (table["group"] == "CTR").sum()
 
 
 # --- plotting -----------------------------------------------------------

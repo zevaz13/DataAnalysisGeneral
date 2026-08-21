@@ -33,6 +33,23 @@
   `np.random.randint`; `weighted_overlap_test` uses
   `np.random.default_rng(seed)`, matching every other permutation/bootstrap
   function in this repo (`ssveps/scripts/permutation.py`, `variance.py`).
+- **Permutation p-value correction, applied here and not yet in `ssveps/`.**
+  `docs/ssvep_summary.md` finding 2.7 flagged `ssveps/scripts/permutation.py`'s
+  `p = (null > obs).mean()` (no `+1`) as a real bug -- a permutation p-value
+  can never legitimately be exactly 0. Both of this project's permutation
+  tests use `p = (1 + count) / (1 + n_perm)` instead, rather than
+  propagating a known issue into new code.
+- **Two independently-constructed spatial tests, not one.**
+  `weighted_overlap_test` (toroidal-shift null) and the newly added
+  `click_value_test` (random-cell null, click-position structure discarded
+  entirely) ask the same question two different ways, so their agreement
+  is corroborating evidence rather than the same computation run twice.
+- **EEG per-subject features reuse `ssveps/files/subject_troughs.csv`
+  directly** (the persisted, canonical ramp_gaussian table), not recomputed
+  -- same reuse-not-rebuild convention as `beh/`'s/`FM100/`'s use of
+  `ssveps/files/metadata.csv`. `ramp_slope_red`/`ramp_slope_green`/
+  `ramp_intercept` used as the EEG severity features (M9's most reliable,
+  always defined) rather than `fitted_*` (NaN for ~half of CVD subjects).
 
 ## M1
 - [x] read /docs/ExperimentalContext.txt -- see `docs/experiment_summary.md`
@@ -40,27 +57,59 @@
 - [x] Implement the code in ssvepBeh/template code
   (`ssvepBeh/scripts/overlap.py`, `plotting.py`).
 - [x] Suggest different ways of testing the relation between the ssvep grid
-  data and the behavioral results -- implemented two:
-  `weighted_overlap_test` (the template's method, refactored/fixed/seeded)
-  and `centroid_distance` (behavioral centroid vs. EEG trough location, a
-  simpler complementary metric). Three more suggested but not built this
-  pass, documented in `01_explore.ipynb`'s closing section: an orientation
-  correlation against `beh/`'s M2 PCA feature, a simpler click-value
-  permutation test, and a cross-session reliability check.
+  data and the behavioral results -- implemented three:
+  `weighted_overlap_test` (the template's method, refactored/fixed/seeded),
+  `click_value_test` (a second, differently-constructed spatial test), and
+  `correlation.py`'s individual-differences convergent-validity analysis
+  (does EEG severity track behavioral severity across subjects, not just
+  spatial overlap) -- plus `centroid_distance` as a simple complementary
+  metric. One more suggested but not built this pass: cross-session
+  reliability of the beh-EEG relationship itself.
 - [x] produce plots and tables with results for each participant, each
   group, each subgroup -- `ssvepBeh/notebooks/01_explore.ipynb`.
+- [x] Make plots showing the steps for HC, PD, CVD, protan and deutan --
+  `01_explore.ipynb`'s EEG-vs-behavioral-density heatmap section now covers
+  all five, not just HC.
+- [x] With the knowledge you have about the data and experiments can you
+  provide other ways of testing this relationship between the tests? Is
+  this analysis we have now enough? -- see `01_explore.ipynb`'s "Is this
+  analysis enough?" section: spatial overlap is well-established (two
+  independent nulls agree completely, every group p<0.05); individual-
+  differences convergence is present but partial and uncorrected for
+  multiple comparisons. Full assessment and next steps below.
 
-**Every group's behavioral clicks concentrate where the EEG response is
-low, significantly more than chance (p<0.05 for HC, PD, CVD, protan, and
-deutan alike)** -- consistent with the metamer hypothesis holding even in
-HC, not just as a CVD-specific signal, directly relevant to the researcher's
-question of whether subtle color-vision trends are visible in nominally
-healthy participants too. Separately, **CVD's behavioral-centroid-to-
-EEG-trough distance (mean ~789) is roughly double HC's (~422) and PD's
-(~406)** -- consistent with CVD participants' perceived color match
-diverging more from their EEG's minimal-response point, plausibly linked to
-`ssveps/`'s M6 finding that CVD trough fits are more likely to peg at the
-sampled range boundary.
+**Spatial overlap: every group's behavioral clicks concentrate where the
+EEG response is low, significantly more than chance, on two independently-
+constructed null models that agree completely** (p<0.05 for HC, PD, CVD,
+protan, and deutan on both `weighted_overlap_test` and `click_value_test`)
+-- consistent with the metamer hypothesis holding even in HC, not just as a
+CVD-specific signal, directly relevant to the researcher's question of
+whether subtle color-vision trends are visible in nominally healthy
+participants too.
+
+**Individual-differences correlation (justifying the EEG test against
+behavior, not just spatial agreement):** pooled across all 43 subjects,
+`orientation_deg` (M2's cleanest behavioral subtype signal) correlates with
+both `ramp_slope_red` (r=0.35, p=0.020) and `ramp_intercept` (r=-0.37,
+p=0.015) -- ssveps' most reliable EEG features. Within deutan alone,
+`beh_red` (behavioral centroid) vs. `eeg_green` (EEG trough location) is
+r=-0.92 (p=0.003, n=7); PD shows `beh_red` vs. `eeg_red` r=0.88 (p=0.021,
+n=6). Protan and CTR's own best pairings don't reach significance at
+their n. **None of this is corrected for multiple comparisons (25 pairs
+tested)** -- read as exploratory, not confirmatory, until that correction
+is applied.
+
+Separately, **CVD's behavioral-centroid-to-EEG-trough distance (mean ~789)
+is roughly double HC's (~422) and PD's (~406)** -- consistent with CVD
+participants' perceived color match diverging more from their EEG's
+minimal-response point, plausibly linked to `ssveps/`'s M6 finding that CVD
+trough fits are more likely to peg at the sampled range boundary.
+
+**What would make this fully "safe and sound" before moving on:**
+multiple-comparisons correction on the correlation matrix, and (the single
+most important remaining gap) cross-session reliability of the beh-EEG
+relationship itself -- a real signal today that isn't stable session to
+session isn't a usable clinical justification.
 
 ## Next milestones
 

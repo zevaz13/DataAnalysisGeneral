@@ -44,25 +44,50 @@ see `beh/README.md`'s Tests section.)
 
 ## Scripts
 
-- `scripts/overlap.py` -- `behavioral_density_map`, `weighted_overlap_test`
-  (seeded, refactored from `templateCode/grid_mapping.py`'s
-  `permWeighted2Dshifts`), `subject_overlap`/`group_overlap` (one-call
-  wrappers), and `centroid_distance` (a second, simpler metric: behavioral
-  centroid vs. EEG trough location).
+- `scripts/overlap.py` -- `behavioral_density_map`; two independently-
+  constructed spatial tests, `weighted_overlap_test` (toroidal-shift null,
+  seeded, refactored from `templateCode/grid_mapping.py`'s
+  `permWeighted2Dshifts`) and `click_value_test` (random-cell null); one-call
+  wrappers for both (`subject_overlap`/`group_overlap`,
+  `subject_click_value_test`/`group_click_value_test`); and
+  `centroid_distance` (a third, simpler metric: behavioral centroid vs. EEG
+  trough location). Both permutation tests use the `(1 + count) / (1 + n_perm)`
+  p-value correction (see below).
+- `scripts/correlation.py` -- individual-differences convergent validity:
+  does a subject's EEG-derived severity track their behavioral severity
+  (not just spatial overlap)? `subject_features_table` (merges beh centroid
+  + M2 PCA shape features with `ssveps/files/subject_troughs.csv`'s
+  ramp features) + `feature_correlations` (Spearman, pooled or per-group).
 - `scripts/plotting.py` -- `plot_overlap`, EEG heatmap + behavioral density
   map side by side, for one participant or a pooled group/list.
+
+## A permutation p-value can't legitimately be exactly 0
+
+`docs/ssvep_summary.md` finding 2.7 flagged `(null > obs).mean()` (no `+1`
+correction) as a real, still-unfixed issue in `ssveps/scripts/permutation.py`
+itself. `overlap.py`'s two permutation tests apply the fix here
+(`p_value = (1 + count) / (1 + n_perm)`) rather than propagating a known bug
+into new code -- worth porting back to `ssveps/` at some point, out of
+scope for this project.
 
 ## Tests
 
 `uv run pytest ssvepBeh/tests -q`. Includes a regression test pinning the
-orientation fix against the original template's output on real data, and a
-`obs_stat` formula check against the template's math.
+orientation fix against the original template's output on real data, an
+`obs_stat`/`obs_mean` formula check against the template's math for both
+spatial tests, and a synthetic-data sanity check for `feature_correlations`.
 
 ## Notebooks
 
 - `01_explore.ipynb` -- M1: one participant's EEG-vs-behavioral overlap;
-  group overlap for HC/PD/CVD/protan/deutan (every group significant,
-  p<0.05, including HC); centroid-distance table by group (CVD's distance
-  is roughly double HC's/PD's); suggested further methods not built in this
-  pass (orientation correlation with `beh/`'s M2 PCA feature, a simpler
-  click-value permutation test, cross-session reliability).
+  group overlap for all five categories on both spatial tests (every group
+  significant on both, including HC); EEG-vs-behavioral-density heatmaps
+  for all five groups; a centroid-distance table by group (CVD's distance
+  is roughly double HC's/PD's); the individual-differences correlation
+  analysis (pooled: `orientation_deg` vs. `ramp_slope_red`/`ramp_intercept`
+  both p<0.02; per-subtype: deutan's `beh_red` vs. `eeg_green` r=-0.92,
+  p=0.003); a critical assessment of whether this is enough (spatial
+  overlap: yes; individual-differences convergence: present but partial and
+  uncorrected); suggested further methods not built this pass (cross-session
+  reliability -- the single most important gap, multiple-comparisons
+  correction).
