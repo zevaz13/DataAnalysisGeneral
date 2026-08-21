@@ -113,33 +113,64 @@ docs/ssvep_beh_fm100_api_reference.md
 
 ## M1: FM100 reliability, then FM100 vs. behavioral
 
-- [ ] Add `scikit-learn` to `pyproject.toml`.
-- [ ] `fm100_features.py`: per-subject, per-session FM100 severity/type
+- [x] Add `scikit-learn` to `pyproject.toml` -- was already present
+  transitively (via `pandas-flavor`) but not declared; `uv add scikit-learn`
+  makes it intentional.
+- [x] `fm100_features.py`: per-subject, per-session FM100 severity/type
   features (`TES`, `VKS_Angle`, `VKS_MajRad`, `VKS_MinRad`), reusing
   `standardizedScores/FM100/scripts/scores.py`. Also a per-subject *pooled*
-  version (mean across that subject's available sessions), for merging with
-  `beh/`'s own already-pooled-across-sessions convention.
-- [ ] FM100 cross-session reliability: ICC(A,1) for each of the four
-  features above, `01_fm100_reliability.ipynb`. Decide, from the result,
-  whether any feature needs dropping or caveating before M1's later steps
-  lean on it.
-- [ ] Merge FM100 (pooled) with `beh/`'s M2 shape features
+  version (mean across that subject's available sessions, `VKS_Angle`
+  pooled circularly), for merging with `beh/`'s own already-pooled-across-
+  sessions convention.
+- [x] FM100 cross-session reliability: ICC(A,1) for the three magnitude
+  features, `circ_corrcc` for `VKS_Angle` (periodic -- a linear ICC would
+  be wrong for it), `01_fm100_reliability.ipynb`. **Result: `TES`
+  (ICC=0.92), `VKS_MinRad` (ICC=0.93), `VKS_MajRad` (ICC=0.84) all
+  reliable; `VKS_Angle` is not** (circular r=0.44, p=0.15, n=19 paired) --
+  carried forward as an explicit caveat on the type/axis test rather than
+  discovered after the fact, the exact mistake `ssvepBeh/` made once
+  already.
+- [x] Merge FM100 (pooled) with `beh/`'s M2 shape features
   (`orientation_deg`, `along_var`, `perp_var`) and centroid, one row per
-  subject present in both datasets (expected: 47, per the overlap check
-  above).
-- [ ] `severity.py`: CCA between `{TES, VKS_MajRad, VKS_MinRad}` and
+  subject present in both datasets -- **47, matching the overlap check
+  above exactly.**
+- [x] `severity.py`: CCA between `{TES, VKS_MajRad, VKS_MinRad}` and
   `{along_var, perp_var}`, seeded permutation test for the top canonical
   correlation's significance.
-- [ ] `type_axis.py`: `circ_axial` + `circ_corrcc` between `VKS_Angle` and
+- [x] `type_axis.py`: `circ_axial` + `circ_corrcc` between `VKS_Angle` and
   `orientation_deg`.
-- [ ] Univariate feature-correlation table (context only, not a
+- [x] Univariate feature-correlation table (context only, not a
   significance claim) between the full FM100 and behavioral feature sets.
-- [ ] `02_fm100_vs_behavioral.ipynb`: reliability results, the merged
+- [x] `02_fm100_vs_behavioral.ipynb`: reliability results, the merged
   table, both primary tests (severity CCA, type circular correlation) with
   plots, the context table, pooled and per-group/subtype where n allows.
-- [ ] `README.md` + `docs/ssvep_beh_fm100_api_reference.md`, matching every
+- [x] `README.md` + `docs/ssvep_beh_fm100_api_reference.md`, matching every
   other project's documentation convention here.
-- [ ] Update `docs/findings.md` once M1 has real results.
+- [x] Update `docs/findings.md` once M1 has real results.
+
+### M1 results
+
+**Severity (CCA, `{TES, VKS_MajRad, VKS_MinRad}` vs. `{along_var,
+perp_var}`): strong and significant pooled (r=0.73, p<0.001, n=47), but
+does not hold up within any single group** (HC r=0.58 p=0.23, n=21; CVD
+r=0.66 p=0.28, n=15; PD r=0.995 p=0.15, n=6; protan/deutan underpowered at
+n=8/7). Honest read: likely at least partly a between-group effect (CVD
+scores worse on both measures than HC, which alone can inflate a pooled
+correlation) rather than a confirmed within-group continuum -- not ruled
+out (CTR's own r=0.58 isn't small), just not yet confirmed at this n.
+
+**Type/axis (circular correlation, `VKS_Angle` vs. `orientation_deg`):
+significant pooled (r=0.37, p=0.009, n=47) *and significant within CVD
+alone*** (r=0.56, p=0.031, n=15) -- unlike severity, this one isn't just a
+between-group artifact. The more solid of the two results, though it rides
+on `VKS_Angle`'s own weaker cross-session reliability (real signal, noisier
+measurement, same situation `ssveps/`'s M9 found for `ramp_slope_red`
+relative to `gain`).
+
+**Both results support the core hypothesis** -- FM100 does encode
+information correlated with behavioral severity/type beyond the
+categorical labels -- with type/axis currently the stronger, more solid
+finding of the two.
 
 ## M2: FM100 vs. EEG
 
