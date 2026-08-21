@@ -1,10 +1,11 @@
-# ssvep_beh_fm100 (FM100 vs. behavioral, later vs. EEG)
+# ssvep_beh_fm100 (FM100 vs. behavioral, and vs. EEG)
 
 Tests the hypothesis that FM100 encodes a continuous "severity of color
 perception deficiency" spectrum, masked by the categorical protan/deutan/
-HC/PD labels -- and that this spectrum correlates with behavioral (and
-later EEG) features. `PLANssvep_bh_fm100.md`'s scope; M1 covers FM100 vs.
-behavioral, M2 (not yet started) extends the same structure to EEG.
+HC/PD labels -- and that this spectrum correlates with behavioral and EEG
+features. `PLANssvep_bh_fm100.md`'s scope; M1 covers FM100 vs. behavioral,
+M2 extends the same structure to EEG, M3 asks whether all three agree
+*jointly*, not just pairwise.
 
 No raw data of its own -- reuses `standardizedScores/FM100/scripts/scores.py`
 and `beh/scripts/features.py` directly. Function-by-function reference:
@@ -42,13 +43,26 @@ not discovered after the fact.
   (`reliability_table`, ICC for magnitude features via
   `ssveps/scripts/reliability.py`'s `feature_icc`, circular correlation for
   `VKS_Angle` since it's periodic).
+- `scripts/eeg_features.py` (M2) -- EEG severity/type features derived
+  from `ssveps/files/subject_troughs.csv`'s ramp fit: `ramp_magnitude`
+  (severity, direction-independent) and the ramp-vector's angle
+  (type/axis) -- see its module docstring for why the angle's genuine
+  directionality is deliberately folded to axial only where it's actually
+  compared against `VKS_Angle`/`orientation_deg`. Reuses
+  `fm100_features.reliability` rather than re-resolving `ssveps/`'s
+  reliability module a second time.
 - `scripts/severity.py` -- `cca_test`: CCA + seeded permutation
   significance test. **Feature-set-agnostic** (any two per-subject feature
-  matrices) so M2 reuses it against EEG features unchanged.
+  matrices) -- used unchanged by both M1 (vs. behavioral) and M2 (vs. EEG).
 - `scripts/type_axis.py` -- `circular_correlation_test`: `circ_axial` +
-  `circ_corrcc` between two angle arrays. Also feature-set-agnostic.
+  `circ_corrcc` between two angle arrays, reused unchanged in M2.
+  `joint_concordance_test` (M3): the same tool generalized to `>= 2` angle
+  arrays at once -- `mean(|pairwise r|)`, permutation-tested. See "Circular
+  correlation sign isn't comparable across pairs" below for why it's an
+  absolute-value mean, not signed.
 - `scripts/plotting.py` -- canonical-variate scatter, permutation null
-  histogram, circular scatter, reliability bar chart.
+  histogram, circular scatter, reliability bar chart, and (M3) a pairwise-
+  `|r|` bar chart + joint-statistic null histogram.
 
 ## A permutation p-value can't legitimately be exactly 0
 
@@ -63,6 +77,17 @@ noise (n=30, 3 vs. 2 features) produces a raw canonical correlation up to
 ~0.48 by chance. The permutation test in `severity.cca_test` is not
 optional decoration -- a raw canonical correlation is meaningless without
 it.
+
+## Circular correlation sign isn't comparable across pairs -- confirmed, not just suspected
+
+M2's `VKS_Angle`-vs-EEG-ramp-angle pooled r was **negative** (-0.40),
+opposite in sign to M1's `VKS_Angle`-vs-`orientation_deg` result
+(**+0.37**) -- each pair of angle spaces has its own arbitrary coordinate
+convention, so sign carries no meaning across different pairs.
+`type_axis.joint_concordance_test`'s statistic is therefore
+`mean(|pairwise r|)`, not a signed mean: a signed combination would let
+pairs partially cancel for no principled reason, exactly the failure mode
+these two real results already demonstrate.
 
 ## Cross-project imports: the same gotcha as `ssvepBeh/`, now three deep
 
@@ -84,9 +109,13 @@ new cross-project import is added here.
 `uv run pytest ssvep_beh_fm100/tests -q`. Includes a pin of the circular-
 mean-folding derivation verified against `pingouin` directly (mean of
 [179deg, 1deg] must fold to ~0deg, not the naive linear mean of 90deg), a
-check that `sklearn`'s CCA never returns a negative r, and pins of the real
-M1 findings (severity CCA pooled significant, type/axis pooled and
-within-CVD significant) as regression tests.
+check that `sklearn`'s CCA never returns a negative r, a pin of the real
+paired-EEG-subject count (19) behind M2's reliability gap, a check that
+`joint_concordance_test`'s `|r|` statistic exceeds what a naive signed mean
+would give on a constructed equal-and-opposite-correlation example, and
+pins of the real M1/M2/M3 findings (both severity CCAs, all three
+pairwise type/axis correlations, and the joint concordance test) as
+regression tests.
 
 ## Notebooks
 
@@ -102,3 +131,28 @@ within-CVD significant) as regression tests.
   alone (r=0.56, p=0.031, n=15) -- the more solid of the two results,
   though riding on `VKS_Angle`'s weaker reliability. A context-only
   univariate feature table, and a summary of both results.
+- `03_eeg_reliability.ipynb` -- M2a: the two derived EEG features'
+  reliability. Both moderate, not strong: `ramp_magnitude` ICC=0.65 (lower
+  than `ramp_slope_red`'s own established 0.85 -- combining it with
+  `ramp_slope_green` diluted it), ramp-angle circular r=0.69. As expected
+  going in, CVD/protan/deutan can't be checked at all (2/2/0 paired
+  subjects).
+- `04_fm100_vs_eeg.ipynb` -- M2b: the same two tests against EEG, reusing
+  `severity.py`/`type_axis.py` unchanged. **Severity**: significant pooled
+  (r=0.50, p=0.047) but weaker than the behavioral version, and doesn't
+  hold up per-group. **Type/axis**: significant pooled (r=-0.40, p=0.014);
+  per-group, only `deutan` (n=7, r=0.66, p=0.034) reaches significance --
+  a lead, not a confirmed finding at that n, weaker than M1's within-CVD
+  result. Both EEG results are weaker than their behavioral counterparts,
+  consistent with EEG being the noisier measure throughout this project.
+- `05_three_way_type_axis.ipynb` -- M3: completes the triangle
+  (`orientation_deg` vs. EEG ramp-angle -- **not significant pooled**,
+  r=-0.23, p=0.13, the one edge that doesn't hold up alone), then runs
+  `joint_concordance_test` on all three angles -- **significant pooled**
+  (mean|r|=0.33, p=0.0012) *despite* that missing edge. The strongest
+  whole-project argument yet for the "masked continuous spectrum"
+  hypothesis: a pattern spread across a triangle, robust to any one weak
+  edge, not concentrated in a single measurement. No group confirms the
+  joint result on its own at current n; `protan` alone is significant on
+  the triangle-completion edge specifically (r=-0.57, p=0.023, n=8) -- a
+  new lead, not yet a finding.

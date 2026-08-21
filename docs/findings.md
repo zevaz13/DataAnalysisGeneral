@@ -154,7 +154,7 @@ the comparison that matters most. That document lays out concrete next
 steps (a smarter multivariate test, and how much more repeat-session CVD
 data would actually help).
 
-## 5. FM100 vs. behavioral: chasing the continuous severity spectrum
+## 5. FM100 vs. behavioral and EEG: chasing the continuous severity spectrum
 
 `ssvep_beh_fm100/notebooks/01_fm100_reliability.ipynb`, then `02_fm100_vs_behavioral.ipynb`
 
@@ -194,6 +194,61 @@ each other the same way in the other. That's a genuinely more convincing
 kind of evidence for a real, continuous, shared signal, even though it's
 riding on FM100's noisier direction feature.
 
+### Then we extended the same two questions to the EEG data
+
+`ssvep_beh_fm100/notebooks/03_eeg_reliability.ipynb`, then `04_fm100_vs_eeg.ipynb`
+
+Same two pre-specified tests, same reused code, now against the EEG
+measures (steepness and direction of how the brain response ramps with
+red/green) instead of your clicks. **Both EEG results echo the behavioral
+ones, just weaker** -- which is itself a consistent, sensible pattern: EEG
+has been the noisier, more indirect measure everywhere else in this
+project too.
+
+- **Severity** lines up significantly overall, but more weakly than with
+  behavioral data, and (same as before) doesn't hold up within any single
+  group at our current sample sizes.
+- **Type/axis** also lines up significantly overall. Within groups, only
+  deutan shows a significant relationship (n=7) -- interesting, but at that
+  size it's a lead worth watching, not yet as solid as the behavioral
+  version's within-CVD result (n=15).
+
+**Put together, the clearest single result across this entire line of
+work is still the behavioral one**: FM100's confusion-ellipse direction
+tracking your click-line orientation within the CVD group alone. The EEG
+extension confirms the same underlying pattern shows up a second way, just
+more faintly -- more evidence for the idea, even if the EEG signal alone
+wouldn't have been convincing on its own.
+
+### Then we asked whether all three agree at once, not just two at a time
+
+`ssvep_beh_fm100/notebooks/05_three_way_type_axis.ipynb`
+
+FM100, your clicks, and the EEG each give a "which way does this
+deficiency point" reading. We'd tested FM100-vs-clicks and FM100-vs-EEG;
+the third pairing -- your clicks directly against the EEG reading, with
+FM100 out of the picture -- had never been checked. So we checked it, and
+then asked the more interesting question it sets up: do all three agree
+*together*, as one combined pattern, even in a case where one of the three
+individual pairings comes up empty?
+
+**The third pairing (clicks vs. EEG) doesn't hold up on its own** -- no
+real relationship there in isolation. That could have been a discouraging
+result. **But testing all three together anyway, as one combined
+question, found a real signal** -- FM100, your clicks, and the EEG do
+share structure as a group, even though one of the three ways of pairing
+them up individually comes up empty. This is honestly the most compelling
+piece of evidence in the whole project for your original idea: it's not
+resting on one strong measurement that might be a fluke, it's a pattern
+that's consistent enough across three completely independent ways of
+measuring the same thing that it survives one of them not lining up
+directly.
+
+We also spotted a new, specific lead worth keeping an eye on: within the
+protan group alone, that "empty" pairing (clicks vs. EEG) actually *does*
+show a significant relationship (though at only 8 protan participants,
+that's a hint to chase with more data, not a settled finding yet).
+
 ## Where this leaves us
 
 - **Solid and ready to lean on:** behavioral group separation (especially
@@ -201,16 +256,23 @@ riding on FM100's noisier direction feature.
   the spatial agreement between clicks and EEG response, and (new) FM100's
   own severity features being reliably measured.
 - **Promising but not yet proven:** whether EEG severity tracks behavioral
-  severity person-by-person; whether FM100's severity spectrum is a true
-  within-group continuum or mostly a between-group difference we already
-  knew about. Both are real, honestly-documented open questions, not dead
-  ends.
-- **The more convincing new result:** FM100's confusion-ellipse direction
-  and your behavioral click-line orientation track each other even within
-  the CVD group alone -- the clearest evidence so far for your "masked
-  continuous spectrum" idea.
-- **Not yet started:** extending this same FM100 comparison to the EEG
-  data (`PLANssvep_bh_fm100.md`'s M2).
+  severity person-by-person; whether FM100's or the EEG's severity spectrum
+  is a true within-group continuum or mostly a between-group difference we
+  already knew about; the EEG version of the type/axis result, currently
+  only significant within deutan at n=7; the new protan-specific
+  clicks-vs-EEG lead from M3 (n=8). All real, honestly-documented open
+  questions, not dead ends.
+- **The most convincing result across the whole project:** the three-way
+  finding -- FM100, your clicks, and the EEG all agree as a group on which
+  way a deficiency points, a pattern robust enough to survive one of the
+  three individual pairings coming up empty. Direct evidence for your
+  "masked continuous spectrum" idea holding up across three independent
+  instruments at once, not just one.
+- **Not yet started:** everything in this line of work now comes back to
+  sample size -- more CVD/protan/deutan participants would let us actually
+  test whether the severity spectrum and the three-way agreement hold up
+  *within* a single diagnostic group, which is the one question none of
+  M1/M2/M3 could fully answer at today's numbers.
 
 ## Come play
 
@@ -229,11 +291,16 @@ mood:
 - Anywhere you see a `seed=` parameter, changing it re-shuffles the
   permutation test's random draws -- a good way to build intuition for how
   stable a given p-value really is.
-- In `ssvep_beh_fm100/notebooks/02_fm100_vs_behavioral.ipynb`, the
+- In `ssvep_beh_fm100/notebooks/02_fm100_vs_behavioral.ipynb`,
+  `04_fm100_vs_eeg.ipynb`, or `05_three_way_type_axis.ipynb`, the
   `categories` list controls which group breakdowns get tested -- try a
   hand-picked `sub_ids` list (e.g. just protan, or MET047/MET021 again) to
   see if the severity or type/axis relationship looks any different for a
   subset you're curious about.
+- `05_three_way_type_axis.ipynb`'s joint test works with any number of
+  angle features, not just three -- if you ever add a fourth angle-style
+  measurement to this project, `type_axis.joint_concordance_test` is ready
+  for it without changes.
 
 Nothing breaks by experimenting -- every notebook reloads its data fresh
 from the raw files each time, so there's nothing to accidentally corrupt.

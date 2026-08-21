@@ -1,5 +1,6 @@
-"""Plots for the severity (CCA) and type/axis (circular correlation) tests,
-and the cross-session reliability table -- M1, PLANssvep_bh_fm100.md.
+"""Plots for the severity (CCA), type/axis (circular correlation and joint
+concordance), and cross-session reliability tests -- M1/M2/M3,
+PLANssvep_bh_fm100.md.
 """
 
 import matplotlib.pyplot as plt
@@ -54,6 +55,39 @@ def plot_circular_scatter(angles_deg_x: np.ndarray, angles_deg_y: np.ndarray, *,
     ax.axhline(180, color="#c3c2b7", linewidth=1)
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
+    return ax
+
+
+def plot_pairwise_bars(joint_result: dict, labels: list[str], *, ax: plt.Axes | None = None) -> plt.Axes:
+    """Bar chart of joint_concordance_test's three (or more) observed
+    |pairwise correlations| -- shows which edge(s) of the triangle are
+    actually carrying the joint result, since the joint statistic alone
+    can't distinguish "all three pairs agree a little" from "one pair
+    agrees a lot." labels names each angle array in the same order passed
+    to joint_concordance_test (e.g. ['FM100', 'Behavioral', 'EEG'])."""
+    if ax is None:
+        _, ax = plt.subplots()
+    pair_labels = [f"{labels[i]} vs.\n{labels[j]}" for i, j in joint_result["pairwise_r"]]
+    values = [abs(r) for r in joint_result["pairwise_r"].values()]
+    ax.bar(pair_labels, values, color=POINT_COLOR)
+    ax.axhline(joint_result["statistic"], color=NULL_COLOR, linewidth=2, linestyle="--", label=f"mean |r|={joint_result['statistic']:.3f}")
+    ax.set_ylabel("|circular correlation|")
+    ax.legend(fontsize=8)
+    return ax
+
+
+def plot_joint_null_distribution(joint_result: dict, *, ax: plt.Axes | None = None) -> plt.Axes:
+    """Histogram of joint_concordance_test's permutation null (null_stat)
+    with the observed statistic drawn as a vertical line -- same pattern as
+    plot_null_distribution, for the joint concordance statistic instead of
+    a CCA canonical correlation."""
+    if ax is None:
+        _, ax = plt.subplots()
+    ax.hist(joint_result["null_stat"], bins=40, color=NULL_COLOR, alpha=0.7)
+    ax.axvline(joint_result["statistic"], color=POINT_COLOR, linewidth=2, label=f"observed mean |r|={joint_result['statistic']:.3f}")
+    ax.set_xlabel("mean |pairwise circular correlation|")
+    ax.set_ylabel("count (permutations)")
+    ax.legend(fontsize=8)
     return ax
 
 
