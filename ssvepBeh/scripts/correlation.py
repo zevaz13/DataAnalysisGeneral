@@ -28,6 +28,7 @@ from pathlib import Path
 
 import pandas as pd
 import pingouin as pg
+from statsmodels.stats.multitest import multipletests
 
 _BEH_SCRIPTS = str(Path(__file__).resolve().parents[2] / "beh" / "scripts")
 # Always move to sys.path[0], not just insert-if-absent: another module may
@@ -131,3 +132,27 @@ def feature_correlations(
                 }
             )
     return pd.DataFrame(rows)
+
+
+def correct_multiple_comparisons(result: pd.DataFrame, *, method: str = "holm", alpha: float = 0.05) -> pd.DataFrame:
+    """Adds p_corrected and significant columns to a feature_correlations
+    result (or any DataFrame with a p_value column), via
+    statsmodels.stats.multitest.multipletests.
+
+    method='holm' (default) controls the family-wise error rate --
+    conservative, the appropriate first-pass correction before treating any
+    individual pooled/per-group correlation as confirmed rather than
+    exploratory (feature_correlations' default feature sets give 25 tests
+    per group/pooled call). Pass method='fdr_bh' (Benjamini-Hochberg) for
+    more power at the cost of a weaker guarantee (expected false-discovery
+    rate, not family-wise error).
+
+    Correction is scoped to whatever rows are passed in -- call once per
+    group/pooled result (not on a concatenation of several) if separate
+    per-block corrections are wanted, which is how this project's own
+    results are organized and reported (see 01_explore.ipynb)."""
+    result = result.copy()
+    reject, p_corrected, _, _ = multipletests(result["p_value"], alpha=alpha, method=method)
+    result["p_corrected"] = p_corrected
+    result["significant"] = reject
+    return result

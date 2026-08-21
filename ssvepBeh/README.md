@@ -57,7 +57,12 @@ see `beh/README.md`'s Tests section.)
   does a subject's EEG-derived severity track their behavioral severity
   (not just spatial overlap)? `subject_features_table` (merges beh centroid
   + M2 PCA shape features with `ssveps/files/subject_troughs.csv`'s
-  ramp features) + `feature_correlations` (Spearman, pooled or per-group).
+  ramp features) + `feature_correlations` (Spearman, pooled or per-group) +
+  `correct_multiple_comparisons` (Holm/FDR via `statsmodels`).
+- `scripts/session_reliability.py` -- is a spatial-overlap or correlation
+  finding stable across EEG sessions? `paired_subjects` +
+  `session_overlap_comparison`/`session_correlation_comparison`, run at
+  EEG session 1 vs. session 2 for the same paired subjects.
 - `scripts/plotting.py` -- `plot_overlap`, EEG heatmap + behavioral density
   map side by side, for one participant or a pooled group/list.
 
@@ -70,12 +75,28 @@ itself. `overlap.py`'s two permutation tests apply the fix here
 into new code -- worth porting back to `ssveps/` at some point, out of
 scope for this project.
 
+## Is this enough? See docs/ssvepbeh_reliability_gaps.md
+
+`01_explore.ipynb`'s findings looked promising uncorrected; `02_reliability
+.ipynb` closes the two gaps that stood between that and "safe and sound,"
+honestly: **spatial overlap holds up** (stable across sessions everywhere
+testable). **The individual-differences correlation does not** -- nothing
+survives multiple-comparisons correction, and where cross-session
+reliability is even computable (protan/deutan/CVD-combined can't be, at
+2/0/2 paired subjects), the correlations aren't stable session to session
+either. `docs/ssvepbeh_reliability_gaps.md` has the full write-up, root
+cause (multidimensionality of the 25-pair test + small per-subtype n, both
+confirmed), and concrete next steps (more repeated-session CVD data, a
+multivariate joint test instead of many univariate ones).
+
 ## Tests
 
 `uv run pytest ssvepBeh/tests -q`. Includes a regression test pinning the
 orientation fix against the original template's output on real data, an
 `obs_stat`/`obs_mean` formula check against the template's math for both
-spatial tests, and a synthetic-data sanity check for `feature_correlations`.
+spatial tests, a synthetic-data sanity check for `feature_correlations`,
+a pin of the real "nothing survives correction" finding, and the real
+paired-subject counts behind the reliability gap.
 
 ## Notebooks
 
@@ -86,8 +107,11 @@ spatial tests, and a synthetic-data sanity check for `feature_correlations`.
   is roughly double HC's/PD's); the individual-differences correlation
   analysis (pooled: `orientation_deg` vs. `ramp_slope_red`/`ramp_intercept`
   both p<0.02; per-subtype: deutan's `beh_red` vs. `eeg_green` r=-0.92,
-  p=0.003); a critical assessment of whether this is enough (spatial
-  overlap: yes; individual-differences convergence: present but partial and
-  uncorrected); suggested further methods not built this pass (cross-session
-  reliability -- the single most important gap, multiple-comparisons
-  correction).
+  p=0.003) -- **since revised, see `02_reliability.ipynb`**.
+- `02_reliability.ipynb` -- closes `01_explore.ipynb`'s two open gaps.
+  Nothing in the correlation matrix survives multiple-comparisons
+  correction. Spatial overlap is reliable across EEG sessions everywhere
+  testable; the correlation analysis is not, and protan/deutan/CVD can't be
+  assessed for reliability at all given today's paired-subject counts.
+  Ends with the honest verdict and next steps (also in
+  `docs/ssvepbeh_reliability_gaps.md`).

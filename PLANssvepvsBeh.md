@@ -111,7 +111,42 @@ most important remaining gap) cross-session reliability of the beh-EEG
 relationship itself -- a real signal today that isn't stable session to
 session isn't a usable clinical justification.
 
+## M1, continued: closing the two gaps
+
+- [x] Multiple-comparisons correction
+  (`correlation.correct_multiple_comparisons`, Holm/FDR via `statsmodels`)
+  -- **nothing survives, pooled or in any group/subtype**, under either
+  method. The strongest pooled pair (`orientation_deg` vs.
+  `ramp_intercept`, uncorrected p=0.015) corrects to p=0.11 under FDR.
+- [x] Cross-session reliability (`ssvepBeh/scripts/session_reliability.py`,
+  `ssvepBeh/notebooks/02_reliability.ipynb`) -- **spatial overlap is
+  reliable** (near-identical obs/p-values session 1 vs. session 2,
+  everywhere testable: pooled n=19, HC n=13, PD n=4 paired subjects).
+  **The correlation analysis is not** (r-values shift substantially
+  session to session for the same feature pair) -- and protan (n=2),
+  deutan (n=0), and CVD-combined (n=2) can't be assessed for reliability
+  at all with today's paired-subject counts.
+- [x] "If we don't reach significance, leave a document explaining the
+  steps we'll take" -- `docs/ssvepbeh_reliability_gaps.md`: confirms your
+  own hypothesis (multidimensionality of the 25-pair univariate test, and
+  small per-subtype n, especially for reliability specifically) as the
+  root cause, and lays out concrete next steps (more repeated-session
+  CVD/protan/deutan data; a multivariate joint test -- CCA or a composite
+  PC1-based severity score, mirroring `ssveps/`'s own M10 -- instead of 25
+  univariate pairs).
+
+**Revised, final verdict for M1:** spatial overlap between behavioral
+clicks and EEG response is solid and can be cited as-is -- significant in
+every group, on two independent null models, stable across sessions.
+Individual-differences correlation is a documented, honestly-reported
+negative result with a concrete path forward, not silently dropped or
+overstated. `01_explore.ipynb`'s correlation findings should be read
+through `02_reliability.ipynb`'s revision, not on their own.
+
 ## Next milestones
 
 FM100-vs-behavioral and FM100-vs-EEG (the researcher's stated higher
-priority per `docs/ExperimentalContext`) -- to be scoped together.
+priority per `docs/ExperimentalContext`) -- to be scoped together. Worth
+carrying `docs/ssvepbeh_reliability_gaps.md`'s lesson forward: check
+paired/per-subtype sample sizes before designing that analysis's
+statistical approach, not after.

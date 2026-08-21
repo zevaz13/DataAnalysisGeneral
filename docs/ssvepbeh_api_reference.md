@@ -94,9 +94,46 @@ unlike `fitted_red`/`green`/`depth`, NaN for roughly half of CVD subjects.
   (`'all'` where unfiltered). `method='spearman'` default (robust to the
   small, possibly-nonlinear per-group samples here, same reasoning as M2's
   Mann-Whitney choice); pass `method='pearson'` for a linear-only check.
-  **Not corrected for multiple comparisons** -- with 25 pairs in the default
-  feature sets, treat any single result as exploratory unless corrected
-  first (see `01_explore.ipynb`'s "Is this analysis enough?" section).
+  **Not corrected for multiple comparisons on its own** -- with 25 pairs in
+  the default feature sets, use `correct_multiple_comparisons` before
+  treating any single result as confirmed (see below; `02_reliability.ipynb`
+  found nothing survives correction, pooled or per group).
+- **`correct_multiple_comparisons(result, *, method='holm', alpha=0.05) -> DataFrame`**
+  Adds `p_corrected`/`significant` columns to a `feature_correlations`
+  result, via `statsmodels.stats.multitest.multipletests`.
+  `method='holm'` (default, family-wise error rate) or `'fdr_bh'`
+  (Benjamini-Hochberg, more power). Correction is scoped to whatever rows
+  are passed in -- call once per group/pooled result, not on a
+  concatenation of several.
+
+## `session_reliability.py` -- cross-session reliability of the beh-EEG relationship
+
+Is a spatial-overlap or correlation finding stable when the EEG side is
+measured at a different session? `02_reliability.ipynb`'s answer: spatial
+overlap yes, individual-differences correlation no (see
+`docs/ssvepbeh_reliability_gaps.md`). Behavioral data has no session
+correspondence to `ssveps/`'s own sessions, so this holds the behavioral
+side fixed (each subject's pooled clicks) and compares the EEG side across
+`ssveps/`'s session 1 and session 2.
+
+- **`MIN_PAIRED_SUBJECTS = 3`** -- matches `ssveps/scripts/reliability.py`'s
+  own minimum for a correlation to be interpretable at all (a 2-point
+  Spearman correlation is always ±1 or undefined).
+- **`paired_subjects(*, group=None, subgroup=None, subject_troughs_path=correlation.SUBJECT_TROUGHS_PATH) -> list[str]`**
+  Subject IDs with EEG trough data at both sessions, computed directly from
+  `ssveps/files/subject_troughs.csv` (which already carries `group`/
+  `subgroup` columns) rather than importing `ssveps/scripts/reliability.py`'s
+  own version (avoids yet another cross-project name collision for a
+  one-line computation). Real counts in this project's data: pooled n=19,
+  CTR n=13, PD n=4, CVD (combined) n=2, protan n=2, **deutan n=0**.
+- **`session_overlap_comparison(beh_df, runmap_df, baselines_df, metadata_df, *, group=None, subgroup=None, sub_ids=None, normalize=analysis.DEFAULT_NORMALIZE, n_perm=5000, seed=None) -> DataFrame`**
+  `weighted_overlap_test`/`click_value_test` run at both EEG sessions on
+  the same paired subjects -- one row per session. Raises `ValueError`
+  below `MIN_PAIRED_SUBJECTS`.
+- **`session_correlation_comparison(beh_df, *, group=None, subgroup=None, sub_ids=None, beh_features=correlation.DEFAULT_BEH_FEATURES, eeg_features=correlation.DEFAULT_EEG_FEATURES, method='spearman') -> DataFrame`**
+  `feature_correlations` run using EEG session 1 vs. session 2 trough data
+  for the same paired subjects -- one row per (beh_feature, eeg_feature,
+  session). Same minimum-n guard.
 
 ## `plotting.py` -- overlap visualization
 
@@ -117,7 +154,14 @@ unlike `fitted_red`/`green`/`depth`, NaN for roughly half of CVD subjects.
   five groups (not just HC); a centroid-distance table by group
   (`centroid_distance`); the individual-differences correlation analysis
   (`correlation.py`), pooled and per-group/subtype; a critical "is this
-  analysis enough" assessment; suggested further methods not built this
-  pass (cross-session reliability, multiple-comparisons correction).
-  *Edit:* `session` (top cell), `categories` (top cell) to look at
-  different group pairs/sessions.
+  analysis enough" assessment. *Edit:* `session` (top cell), `categories`
+  (top cell) to look at different group pairs/sessions.
+- **`02_reliability.ipynb`** -- closes `01_explore.ipynb`'s two open gaps.
+  Multiple-comparisons correction (`correct_multiple_comparisons`): nothing
+  survives, pooled or per group. Cross-session reliability
+  (`session_reliability.py`): spatial overlap is stable across sessions
+  everywhere testable (pooled/HC/PD); the correlation analysis is not
+  (r-values shift substantially session to session), and protan/deutan/CVD
+  can't be assessed at all (2/0/2 paired subjects). Full write-up and next
+  steps: `docs/ssvepbeh_reliability_gaps.md`. *Edit:* the category lists in
+  the cross-session-reliability cells to check a different subset.

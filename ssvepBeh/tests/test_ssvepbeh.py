@@ -49,6 +49,7 @@ sys.path.insert(0, str(SCRIPTS))
 sys.modules.pop("plotting", None)
 import plotting  # noqa: E402
 import correlation  # noqa: E402 -- inserts beh/scripts and imports "features" (unique name), no further defense needed
+import session_reliability  # noqa: E402 -- only imports overlap/correlation (unique names), no further defense needed
 
 analysis = overlap.analysis  # ssveps/scripts/analysis.py, already imported by overlap
 
@@ -307,6 +308,73 @@ def test_feature_correlations_filters_by_group(beh_df):
     result = correlation.feature_correlations(table, group="CTR")
     assert (result["group"] == "CTR").all()
     assert result["n"].iloc[0] == (table["group"] == "CTR").sum()
+
+
+# --- correct_multiple_comparisons -------------------------------------------
+
+
+def test_correct_multiple_comparisons_flags_a_strong_signal_among_noise():
+    """One p-value far below the rest -- Holm should still flag it as
+    significant even after correcting for the other 9 tests."""
+    result = pd.DataFrame({"p_value": [0.0001] + [0.5] * 9})
+    corrected = correlation.correct_multiple_comparisons(result, method="holm")
+    assert corrected["significant"].iloc[0]
+    assert not corrected["significant"].iloc[1:].any()
+    assert (corrected["p_corrected"] >= corrected["p_value"]).all()
+
+
+def test_correct_multiple_comparisons_fdr_is_less_conservative_than_holm():
+    result = pd.DataFrame({"p_value": [0.001, 0.01, 0.02, 0.03, 0.04, 0.5, 0.6, 0.7, 0.8, 0.9]})
+    holm = correlation.correct_multiple_comparisons(result, method="holm")
+    fdr = correlation.correct_multiple_comparisons(result, method="fdr_bh")
+    assert fdr["significant"].sum() >= holm["significant"].sum()
+
+
+def test_correct_multiple_comparisons_none_of_the_real_pooled_pairs_survive(beh_df):
+    """Pins the actual finding this analysis produced: with 43 subjects and
+    25 pairwise tests, nothing clears Holm or FDR correction -- the
+    individual-differences correlation is real-looking but not yet
+    statistically supported, per docs/ssvepbeh_reliability_gaps.md."""
+    table = correlation.subject_features_table(beh_df, session=1)
+    pooled = correlation.feature_correlations(table)
+    corrected = correlation.correct_multiple_comparisons(pooled, method="fdr_bh")
+    assert not corrected["significant"].any()
+
+
+# --- session_reliability -----------------------------------------------------
+
+
+def test_paired_subjects_matches_known_counts():
+    """Pins the real paired-subject counts behind this project's reliability
+    gap -- protan/deutan/CVD(combined) are all too thin to assess."""
+    assert len(session_reliability.paired_subjects()) == 19
+    assert len(session_reliability.paired_subjects(group="CTR")) == 13
+    assert len(session_reliability.paired_subjects(group="PD")) == 4
+    assert len(session_reliability.paired_subjects(group="CVD")) == 2
+    assert len(session_reliability.paired_subjects(group="CVD", subgroup="protan")) == 2
+    assert len(session_reliability.paired_subjects(group="CVD", subgroup="deutan")) == 0
+
+
+def test_session_overlap_comparison_raises_below_minimum(beh_df, runmap_df, baselines_df, metadata_df):
+    with pytest.raises(ValueError):
+        session_reliability.session_overlap_comparison(beh_df, runmap_df, baselines_df, metadata_df, group="CVD", subgroup="deutan")
+
+
+def test_session_correlation_comparison_raises_below_minimum(beh_df):
+    with pytest.raises(ValueError):
+        session_reliability.session_correlation_comparison(beh_df, group="CVD", subgroup="deutan")
+
+
+def test_session_overlap_comparison_returns_one_row_per_session(beh_df, runmap_df, baselines_df, metadata_df):
+    result = session_reliability.session_overlap_comparison(beh_df, runmap_df, baselines_df, metadata_df, group="CTR", n_perm=200, seed=0)
+    assert list(result["session"]) == [1, 2]
+    assert (result["n"] == 13).all()
+
+
+def test_session_correlation_comparison_returns_both_sessions(beh_df):
+    result = session_reliability.session_correlation_comparison(beh_df, group="CTR")
+    assert set(result["session"]) == {1, 2}
+    assert len(result) == 2 * len(correlation.DEFAULT_BEH_FEATURES) * len(correlation.DEFAULT_EEG_FEATURES)
 
 
 # --- plotting -----------------------------------------------------------
