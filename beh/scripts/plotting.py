@@ -19,14 +19,23 @@ uses for its boxplots.
 """
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
+from comparisons import group_points
 from features import group_features, subject_pca_line
 from loader import subjects_in_group
 
 POINT_COLOR = "#2a78d6"
 SESSION_COLORS = ["#2a78d6", "#eb6834", "#1baf7a"]  # validated all-pairs for scatter, up to 3 categories
 FIT_LINE_COLOR = "#52514e"  # secondary ink, not a categorical slot: this is a derived overlay, not a series
+# Full 8-hue categorical order (dataviz skill's default palette), for the centroid
+# plots below -- those are a handful of large, legended, well-separated marks, not
+# a dense point cloud, so past 3 categories identity is carried by CENTROID_MARKERS
+# (shape) as well as color, not by hue alone (past slot 3 the palette isn't
+# all-pairs colorblind-safe on its own -- see plot_feature_space/SESSION_COLORS).
+FULL_PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
+CENTROID_MARKERS = ["o", "s", "^", "D", "P", "X", "v", "*"]
 XLIM = (0, 3200)
 YLIM = (0, 2000)
 
@@ -41,6 +50,17 @@ def _style_axes(ax: plt.Axes, *, xlim: tuple[float, float], ylim: tuple[float, f
     ax.set_ylabel("green")
     if title:
         ax.set_title(title)
+
+
+def _plot_centroid_series(ax: plt.Axes, label: str, points: np.ndarray, *, color: str, marker: str) -> None:
+    """One category's centroid (mean of points, ±1 SD error bars) as a
+    single marker -- shared by plot_group_centroids and
+    plot_feature_group_centroids (M3)."""
+    mean = points.mean(axis=0)
+    sd = points.std(axis=0, ddof=1) if len(points) > 1 else (0.0, 0.0)
+    ax.errorbar(
+        mean[0], mean[1], xerr=sd[0], yerr=sd[1], fmt=marker, color=color, markersize=10, markeredgecolor="white", capsize=4, label=f"{label} (n={len(points)})"
+    )
 
 
 def _multi_panel_figure(n: int, *, max_cols: int = MAX_PANEL_COLS, panel_size: float = 3.5) -> tuple[plt.Figure, list[plt.Axes]]:
@@ -204,5 +224,61 @@ def plot_feature_space(
         ax.scatter(feats[x_feature], feats[y_feature], color=color, alpha=0.8, edgecolor="white", label=f"{cat['label']} (n={len(feats)})")
     ax.set_xlabel(x_feature)
     ax.set_ylabel(y_feature)
+    ax.legend(fontsize=8)
+    return ax
+
+
+def plot_subject_centroids(df: pd.DataFrame, categories: list[dict], *, xlim: tuple[float, float] = XLIM, ylim: tuple[float, float] = YLIM, ax: plt.Axes | None = None) -> plt.Axes:
+    """One point per subject, at that subject's own mean (red, green) across
+    every click/session (comparisons.group_points's unit='subject' points,
+    plotted directly instead of collapsed into a single Hotelling T^2 stat)
+    -- M3. categories is the same {"label", "group", "subgroup"} shape as
+    plot_groups_side_by_side, capped at len(SESSION_COLORS) like
+    plot_feature_space: every point here can sit next to any other, so it
+    inherits the same all-pairs scatter color limit."""
+    if len(categories) > len(SESSION_COLORS):
+        raise ValueError(f"plot_subject_centroids supports at most {len(SESSION_COLORS)} categories (scatter all-pairs color limit), got {len(categories)}")
+    if ax is None:
+        _, ax = plt.subplots()
+    for cat, color in zip(categories, SESSION_COLORS):
+        points = group_points(df, group=cat.get("group"), subgroup=cat.get("subgroup"), unit="subject")
+        ax.scatter(points[:, 0], points[:, 1], color=color, alpha=0.85, edgecolor="white", s=60, label=f"{cat['label']} (n={len(points)})")
+    _style_axes(ax, xlim=xlim, ylim=ylim, title="Subject centroids")
+    ax.legend(fontsize=8)
+    return ax
+
+
+def plot_group_centroids(df: pd.DataFrame, categories: list[dict], *, xlim: tuple[float, float] = XLIM, ylim: tuple[float, float] = YLIM, ax: plt.Axes | None = None) -> plt.Axes:
+    """One marker per category: the centroid of its subjects' own (red,
+    green) means, ±1 SD error bars across those subject centroids -- M3.
+    No category-count cap (see FULL_PALETTE/CENTROID_MARKERS above):
+    identity is carried by marker shape as well as color."""
+    if ax is None:
+        _, ax = plt.subplots()
+    for i, cat in enumerate(categories):
+        points = group_points(df, group=cat.get("group"), subgroup=cat.get("subgroup"), unit="subject")
+        _plot_centroid_series(ax, cat["label"], points, color=FULL_PALETTE[i % len(FULL_PALETTE)], marker=CENTROID_MARKERS[i % len(CENTROID_MARKERS)])
+    _style_axes(ax, xlim=xlim, ylim=ylim, title="Group centroids (mean ± 1 SD across subjects)")
+    ax.legend(fontsize=8)
+    return ax
+
+
+def plot_feature_group_centroids(
+    df: pd.DataFrame, categories: list[dict], *, x_feature: str = "orientation_deg", y_feature: str = "perp_var", ax: plt.Axes | None = None
+) -> plt.Axes:
+    """Same as plot_group_centroids, in shape-feature space instead of
+    (red, green) -- M3, the feature analog of plot_feature_space the same
+    way plot_group_centroids is the analog of plot_subject_centroids. One
+    marker per category at the mean of its subjects' x_feature/y_feature
+    values, ±1 SD error bars, no category-count cap."""
+    if ax is None:
+        _, ax = plt.subplots()
+    for i, cat in enumerate(categories):
+        feats = group_features(df, group=cat.get("group"), subgroup=cat.get("subgroup"))
+        points = feats[[x_feature, y_feature]].to_numpy()
+        _plot_centroid_series(ax, cat["label"], points, color=FULL_PALETTE[i % len(FULL_PALETTE)], marker=CENTROID_MARKERS[i % len(CENTROID_MARKERS)])
+    ax.set_xlabel(x_feature)
+    ax.set_ylabel(y_feature)
+    ax.set_title(f"Group centroids: {x_feature} vs {y_feature}")
     ax.legend(fontsize=8)
     return ax

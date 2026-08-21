@@ -239,3 +239,57 @@ def test_plot_feature_space_one_series_per_category(df):
     categories = [{"label": "HC", "group": "CTR"}, {"label": "PD", "group": "PD"}]
     ax = plotting.plot_feature_space(df, categories)
     assert len(ax.collections) == len(categories)
+
+
+# --- centroid plots (M3) --------------------------------------------------
+
+
+def test_plot_subject_centroids_one_series_per_category(df):
+    categories = [{"label": "HC", "group": "CTR"}, {"label": "PD", "group": "PD"}]
+    ax = plotting.plot_subject_centroids(df, categories)
+    assert len(ax.collections) == len(categories)
+
+
+def test_plot_subject_centroids_rejects_more_categories_than_session_colors(df):
+    categories = [
+        {"label": "HC", "group": "CTR"},
+        {"label": "PD", "group": "PD"},
+        {"label": "CVD", "group": "CVD"},
+        {"label": "protan", "subgroup": "protan"},
+    ]
+    with pytest.raises(ValueError):
+        plotting.plot_subject_centroids(df, categories)
+
+
+def test_plot_group_centroids_one_marker_per_category_beyond_the_scatter_cap(df):
+    """Unlike plot_subject_centroids/plot_feature_space, this one has no
+    category-count cap -- pin that 5 categories works."""
+    categories = [
+        {"label": "HC", "group": "CTR"},
+        {"label": "PD", "group": "PD"},
+        {"label": "CVD", "group": "CVD"},
+        {"label": "protan", "subgroup": "protan"},
+        {"label": "deutan", "subgroup": "deutan"},
+    ]
+    ax = plotting.plot_group_centroids(df, categories)
+    _, labels = ax.get_legend_handles_labels()
+    assert len(labels) == len(categories)
+
+
+def test_plot_group_centroids_marker_is_at_the_mean_of_subject_centroids(df):
+    categories = [{"label": "PD", "group": "PD"}]
+    ax = plotting.plot_group_centroids(df, categories)
+    expected = comparisons.group_points(df, group="PD", unit="subject").mean(axis=0)
+    line = ax.lines[0]
+    np.testing.assert_allclose(line.get_xydata()[0], expected)
+
+
+def test_plot_feature_group_centroids_one_marker_per_category(df):
+    categories = [
+        {"label": "HC", "group": "CTR"},
+        {"label": "protan", "subgroup": "protan"},
+        {"label": "deutan", "subgroup": "deutan"},
+    ]
+    ax = plotting.plot_feature_group_centroids(df, categories)
+    _, labels = ax.get_legend_handles_labels()
+    assert len(labels) == len(categories)

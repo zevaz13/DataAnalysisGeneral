@@ -72,6 +72,22 @@ identity in hue -- see `beh/README.md`.
 (`features.subject_pca_line`), in `FIT_LINE_COLOR` (secondary ink, since
 it's a derived overlay, not a data series).
 
+- **`plot_subject_centroids(df, categories, *, xlim=XLIM, ylim=YLIM, ax=None) -> Axes`**
+  M3: one point per subject, at that subject's own mean (red, green) --
+  `comparisons.group_points(..., unit='subject')`'s points, plotted
+  directly. Same `categories` shape and `len(SESSION_COLORS)` (3) cap as
+  `plot_feature_space`, for the same all-pairs-scatter reason.
+- **`plot_group_centroids(df, categories, *, xlim=XLIM, ylim=YLIM, ax=None) -> Axes`**
+  M3: one marker per category, at the mean of its subjects' own (red, green)
+  means, with ±1 SD error bars across those subject centroids. No category
+  cap -- a handful of large, legended marks rather than a dense scatter,
+  so identity is carried by `CENTROID_MARKERS` (shape) as well as color
+  (`FULL_PALETTE`, the dataviz skill's full 8-hue order), not by hue alone.
+- **`plot_feature_group_centroids(df, categories, *, x_feature='orientation_deg', y_feature='perp_var', ax=None) -> Axes`**
+  M3: the shape-feature analog of `plot_group_centroids` -- one marker per
+  category at the mean of its subjects' `x_feature`/`y_feature` values, same
+  ±1 SD error bars, same no-cap/marker-shape treatment.
+
 ## `features.py` -- PCA shape features and per-feature comparisons (M2)
 
 Complements `comparisons.py`: instead of comparing groups' (red, green)
@@ -173,3 +189,10 @@ Each opens with `sys.path.append('../scripts')`, so run them with
   comparisons as M1, run via `compare_shape_feature` on each of
   `orientation_deg`, `along_var`, `perp_var`. *Edit:* `comparison_specs`
   (shared with `01_explore.ipynb`'s list) to look at different group pairs.
+- **`03_centroids.ipynb`** -- M3: `plot_subject_centroids` (HC/PD/CVD, then
+  HC/protan/deutan) and `plot_group_centroids` (all 5 categories at once)
+  in (red, green) space; the same two plot types in shape-feature space
+  (`plot_feature_space`/`plot_feature_group_centroids`) for all three
+  pairwise combinations of `orientation_deg`, `along_var`, `perp_var`.
+  *Edit:* `top_level_categories`/`subtype_categories`/`all_categories` to
+  look at different group sets.

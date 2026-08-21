@@ -61,6 +61,10 @@ Raw column -> tidy column, renamed for consistency with `ssveps/`'s naming:
   subject's pooled clicks -- line orientation, spread along it, scatter off
   it) and per-feature group comparisons (Mann-Whitney U + effect size, via
   `pingouin`), complementing `comparisons.py`'s mean-only Hotelling T².
+- `scripts/plotting.py` also gained (M3) `plot_subject_centroids`/
+  `plot_group_centroids` (each subject's, or each group's, own mean (red,
+  green) as a single point) and `plot_feature_group_centroids` (the same for
+  shape features) -- see below.
 
 ## Tests
 
@@ -90,3 +94,6 @@ Each opens with `sys.path.append('../scripts')`, so run them with
   (orientation, along-line spread, perpendicular tightness); fitted-line
   overlays and a feature-space scatter; the same five group comparisons as
   M1, run per feature instead of on the mean.
+- `03_centroids.ipynb` -- M3: per-subject and per-group centroid plots, in
+  both (red, green) space and shape-feature space (all three feature
+  pairings).

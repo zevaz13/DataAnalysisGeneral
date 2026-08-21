@@ -117,10 +117,34 @@ Worth checking whether an orientation/direction-style feature can be
 extracted from the SSVEP gamut data too, as it may outperform
 `ramp_slope_red` there the same way.
 
-## M3. other
+## M3. Centroid plots
 
-- [ ] make a plot for centroids, per subject, and groups. The one per subject, please color code the grorups. 
-- [ ] Do the same type of plot for all the new features. 
+- [x] Per-subject centroids, color-coded by group
+  (`plotting.plot_subject_centroids`) -- each subject collapsed to their own
+  mean (red, green). The dataviz skill's all-pairs scatter color limit caps
+  a single hue-coded panel at 3 categories (same rule `plot_feature_space`
+  already follows), so this is two panels in `03_centroids.ipynb`:
+  HC/PD/CVD, then HC/protan/deutan.
+- [x] Group centroids (`plotting.plot_group_centroids`) -- each group
+  collapsed to the mean of its subjects' centroids, ±1 SD error bars. A
+  handful of large, legended marks rather than a dense scatter, so all 5
+  categories go on one panel, with marker *shape* (`CENTROID_MARKERS`)
+  carrying identity alongside color -- not hue alone, past the 3-category
+  safe limit.
+- [x] The same two plot types for the M2 shape features
+  (`plot_feature_space` for per-subject, new `plot_feature_group_centroids`
+  for group centroids), all three pairwise combinations of
+  `orientation_deg`/`along_var`/`perp_var`, in `03_centroids.ipynb`.
+
+Group centroids: deutan is the least homogeneous group by far (SD ~430 red /
+~280 green vs. HC's ~113/~90), consistent with M1/M2. On the feature
+centroids, `orientation_deg`'s error bars never overlap between protan
+(173°, SD 2.3) and deutan (144°, SD 8.7) in either pairwise plot -- both far
+tighter than HC's 35°, SD 47° (HC has no consistent line direction at all).
+`along_var`/`perp_var` error bars overlap across every group, visually
+confirming M2's non-significant tests on those two features. Orientation
+remains the one shape feature that cleanly separates every group, on both
+the raw scatter and the centroid view.
 
 ## Next milestones
 
