@@ -46,7 +46,12 @@ first axis is actually **green** and its second **red** (confirmed three ways
   (built by `scripts/build_troughs.py`). `subject_troughs.csv` also carries a
   ramp-only fit (`ramp_intercept`/`ramp_slope_red`/`ramp_slope_green`/
   `ramp_r_squared`, M6) that's defined for every row, unlike the `fitted_*`
-  columns which can fail to locate an interior trough.
+  columns which can fail to locate an interior trough; and a rotated-dip fit
+  (`rotated_red`/`rotated_green`/`rotated_depth`/`rotated_amp`/
+  `rotated_sigma_major`/`rotated_sigma_minor`/`rotated_orientation_deg`/
+  `rotated_r_squared`/`rotated_at_bound`/`rotated_valid`, M11) — purely
+  additive alongside `fitted_*`, adds a tilt the axis-aligned fit can't
+  express. See `16_grid_shape_features.ipynb`.
 
 M7's variance components, M8's gain/shape decomposition, and M10's PCA
 components are not persisted to CSV -- all three depend on a choice made at
@@ -84,6 +89,13 @@ intrinsic per-subject property, so they're computed fresh in their notebooks.
   `slope_green`/`r_squared`, defined for every subject regardless of whether a
   trough was ever located — the continuous measure used for CVD subjects whose
   trough lies beyond the sampled red range
+- `fit_rotated_gaussian` — a tilted, anisotropic generalization of
+  `fit_ramp_gaussian`'s dip (M11): `sigma_major`/`sigma_minor`/`orientation_deg`
+  instead of axis-aligned `sigma_red`/`sigma_green`, `orientation_deg` folded
+  into `[0, 180)` to match `beh/`'s own convention. Purely additive — does not
+  touch `fit_ramp_gaussian`. Same `at_bound`/`fit_valid` flags; converges less
+  often into a *valid* (non-pegged) fit than the axis-aligned version, since
+  it has one more parameter to identify (see `16_grid_shape_features.ipynb`)
 - `extrapolate_ramp_crossing` — given a `fit_ramp` result and a target
   depth/green (typically a population reference, not the subject's own
   unreliable fit), the red value at which that ramp would reach it —
@@ -193,9 +205,12 @@ values a diverging blue/red one centered on zero (signed).
 
 ## Tests
 
-`uv run pytest ssveps/tests -q` — 14 regression tests pinning the axis
+`uv run pytest ssveps/tests -q` — 46 regression tests pinning the axis
 orientation, the normalization formulas, the ragged 3-run subjects, cluster
-connectivity, permutation reproducibility, and the 5-column panel wrapping.
+connectivity, permutation reproducibility, the 5-column panel wrapping, and
+(M11) `fit_rotated_gaussian`'s recovery of a known tilted dip, its
+axis-aligned-canonicalization, and that adding it to `subject_troughs`
+leaves every existing column unchanged.
 
 ## Notebooks
 
@@ -240,3 +255,15 @@ familiar.
   project's actual sample sizes -- updates the primary-outcome recommendation
 - `12_pca.ipynb` — M10: PCA of the 100-cell grids with permutation-based
   component selection, loading maps, and a group comparison of PC1
+- `13_hc_vs_pd.ipynb` — M11: side-by-side grids, a raw/percent difference
+  map, and subject-level (`ramp_slope_red`) + descriptive pixel-level
+  boxplots for HC vs PD
+- `14_hc_vs_subtypes.ipynb` — M11: same structure, three-way HC/protan/deutan
+  with all three pairwise comparisons
+- `15_permutation_stability.ipynb` — M11: all three permutation tests on
+  protan vs deutan at 200 seeds each — a corrected-significant cluster
+  survives in 86.5%-98% of seeds, not a fluke; see `docs/methods.md`'s M3
+  section for the surviving cluster's location
+- `16_grid_shape_features.ipynb` — M11: `fit_rotated_gaussian`'s tilted-dip
+  shape features, per group; not enough `rotated_valid` fits yet for the
+  protan-vs-deutan comparison (2/8, 3/7)

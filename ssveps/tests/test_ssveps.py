@@ -178,6 +178,89 @@ def test_fit_trough_surface_methods_share_a_schema(axes):
         assert set(analysis.fit_trough_surface(grid, red_vals, green_vals, method=method)) == keys
 
 
+# --- rotated dip fit (M11) --------------------------------------------------
+
+
+def test_rotated_gaussian_converges_on_every_subject(data, axes):
+    runmap, baselines, meta = data
+    red_vals, green_vals = axes
+    for row in meta.to_dict("records"):
+        grid = analysis.mean_grid(runmap, baselines, row["sub_id"], row["session"],
+                                  normalize=analysis.DEFAULT_NORMALIZE)
+        assert not np.isnan(analysis.fit_rotated_gaussian(grid, red_vals, green_vals)["r_squared"])
+
+
+def test_rotated_gaussian_at_bound_on_pure_ramp(axes):
+    """Same pure-ramp case as fit_ramp_gaussian's own at_bound test: no
+    interior dip anywhere in range, so the fit must peg and say so."""
+    red_vals, green_vals = axes
+    x, y = np.meshgrid(red_vals, green_vals, indexing="ij")
+    grid = 2.0 - 0.0004 * x
+    fit = analysis.fit_rotated_gaussian(grid, red_vals, green_vals)
+    assert fit["at_bound"]
+    assert not fit["fit_valid"]
+
+
+def test_rotated_gaussian_recovers_a_known_tilted_dip(axes):
+    """The point of this model over fit_ramp_gaussian: plant a dip whose
+    major axis is neither the red nor the green axis, and check the fit
+    actually recovers the tilt, not just location/amplitude."""
+    red_vals, green_vals = axes
+    x, y = np.meshgrid(red_vals, green_vals, indexing="ij")
+    truth = dict(x0=2000.0, y0=900.0, amp=0.5, sigma_major=700.0, sigma_minor=300.0, theta=np.radians(30.0))
+    dx, dy = x - truth["x0"], y - truth["y0"]
+    xr = dx * np.cos(truth["theta"]) + dy * np.sin(truth["theta"])
+    yr = -dx * np.sin(truth["theta"]) + dy * np.cos(truth["theta"])
+    grid = (1.5 - 0.0001 * x - 0.00005 * y
+            - truth["amp"] * np.exp(-(xr**2 / (2 * truth["sigma_major"] ** 2) + yr**2 / (2 * truth["sigma_minor"] ** 2))))
+    fit = analysis.fit_rotated_gaussian(grid, red_vals, green_vals)
+    assert fit["fit_valid"]
+    assert fit["red"] == pytest.approx(truth["x0"], abs=60)
+    assert fit["green"] == pytest.approx(truth["y0"], abs=60)
+    assert fit["amp"] == pytest.approx(truth["amp"], rel=0.1)
+    assert fit["sigma_major"] == pytest.approx(truth["sigma_major"], rel=0.15)
+    assert fit["sigma_minor"] == pytest.approx(truth["sigma_minor"], rel=0.15)
+    assert fit["orientation_deg"] == pytest.approx(30.0, abs=5)
+    assert fit["r_squared"] > 0.999
+
+
+def test_rotated_gaussian_canonicalizes_major_as_the_longer_axis(axes):
+    """An axis-aligned dip elongated along green (sigma_green > sigma_red,
+    i.e. true tilt = 90deg) should still come back with sigma_major as the
+    longer one and orientation folded into [0, 180), not left at 90+90."""
+    red_vals, green_vals = axes
+    x, y = np.meshgrid(red_vals, green_vals, indexing="ij")
+    truth = dict(x0=2000.0, y0=900.0, amp=0.5, sx=250.0, sy=650.0)
+    grid = (1.5 - 0.0001 * x - 0.00005 * y
+            - truth["amp"] * np.exp(-(((x - truth["x0"]) ** 2) / (2 * truth["sx"] ** 2)
+                                      + ((y - truth["y0"]) ** 2) / (2 * truth["sy"] ** 2))))
+    fit = analysis.fit_rotated_gaussian(grid, red_vals, green_vals)
+    assert fit["fit_valid"]
+    assert fit["sigma_major"] > fit["sigma_minor"]
+    assert fit["sigma_major"] == pytest.approx(truth["sy"], rel=0.15)
+    assert fit["orientation_deg"] == pytest.approx(90.0, abs=5)
+
+
+def test_subject_troughs_adds_rotated_columns_without_touching_existing_ones(data):
+    """Purely additive: every fitted_*/ramp_* number stays exactly what
+    build_troughs.py already persisted, and the new rotated_* columns show
+    up alongside them."""
+    runmap, baselines, meta = data
+    one_subject = meta[(meta["sub_id"] == "MET000") & (meta["session"] == 1)]
+    without_rotated_cols = {
+        "sub_id", "session", "group", "subgroup", "red", "green", "depth", "red_idx", "green_idx",
+        "fitted_red", "fitted_green", "fitted_depth", "fitted_amp", "fitted_sigma_red", "fitted_sigma_green",
+        "fitted_r_squared", "fitted_at_bound", "fitted_valid",
+        "ramp_intercept", "ramp_slope_red", "ramp_slope_green", "ramp_r_squared",
+    }
+    rotated_cols = {
+        "rotated_red", "rotated_green", "rotated_depth", "rotated_amp", "rotated_sigma_major",
+        "rotated_sigma_minor", "rotated_orientation_deg", "rotated_r_squared", "rotated_at_bound", "rotated_valid",
+    }
+    troughs = analysis.subject_troughs(runmap, baselines, one_subject)
+    assert set(troughs.columns) == without_rotated_cols | rotated_cols
+
+
 # --- ramp-only fit, extrapolation, bootstrap CI (M6) ------------------------
 
 

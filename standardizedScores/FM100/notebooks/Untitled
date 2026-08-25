@@ -1,0 +1,4 @@
+
+
+# HC = the data's CTR (control) group label -- same categories convention as ssveps
+categories = [

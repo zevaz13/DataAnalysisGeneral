@@ -234,6 +234,41 @@ refitting) for a single subject's fitted-statistic CI (e.g. the ramp-crossing
 extrapolation above). `run_grids` was made public specifically to support the
 latter.
 
+## Rotated-dip fit and grid shape features (M11)
+
+`analysis.fit_rotated_gaussian` generalizes `fit_ramp_gaussian`'s dip from
+axis-aligned (`sigma_red`, `sigma_green` independently, no tilt) to a
+rotated, anisotropic Gaussian: standard `sigma_major`/`sigma_minor`/`theta`
+parameterization (rather than fitting the ellipse's `a`/`b`/`c` quadratic
+coefficients directly, which doesn't guarantee a positive-definite,
+physically valid ellipse). `theta` is bounded to `[0, pi)` during the fit;
+`sigma_major`/`sigma_minor` are canonicalized afterward (swapped, with
+`theta` rotated 90deg, if the fit put the larger sigma second) so "major"
+always means the longer axis, and `orientation_deg` is folded into
+`[0, 180)` -- the SSVEP-grid analog of `beh/scripts/features.py`'s
+`orientation_deg` on the behavioral click cloud (M2), deliberately built the
+same way (fit in native red/green units, not rescaled to comparable
+variance first) so the two are directly comparable later via
+`ssvep_beh_fm100/scripts/type_axis.py`.
+
+Purely additive: `fit_ramp_gaussian` and its bounds/behavior/persisted
+columns are untouched. Same `at_bound`/`fit_valid` semantics as
+`fit_ramp_gaussian`, plus one caveat specific to this model: `orientation_deg`
+is poorly identified as `sigma_major` approaches `sigma_minor` (a nearly
+circular dip has no well-defined tilt).
+
+**Converges less often into a *valid* fit than the axis-aligned version, on
+real data.** `16_grid_shape_features.ipynb`: `rotated_valid` at session 1 is
+90% for HC and 100% for PD, but only 25% for protan (2/8) and 43% for
+deutan (3/7) -- one more free parameter (the tilt) to identify, on top of an
+already-common failure mode (M6: most CVD subjects' true trough already
+lies beyond the sampled red range, which pegs *any* dip-shaped fit, rotated
+or not). With only 2 valid protan fits, a protan-vs-deutan comparison on the
+new shape features isn't statistically testable yet at this sample size --
+same standing recommendation as everywhere else in this project (more
+CVD/protan/deutan subjects), now also the blocker for this specific
+question.
+
 ## Within/between-subject variance decomposition (M7)
 
 `variance.py` replaces the point-estimate within/between SD split in
@@ -452,6 +487,28 @@ tail's `max()`.
 Cluster connectivity is 8-connected (`scipy.ndimage.label` with a full 3x3
 structuring element) to match MATLAB `bwconncomp`'s 2D default -- `scipy`'s
 own default is 4-connected (cross-shaped), so this must be passed explicitly.
+
+**Seed stability, checked directly (M11).** These tests don't return a single
+p-value -- "significant" means at least one cluster survives correction, and
+that depends on the RNG draw. `15_permutation_stability.ipynb` re-ran all
+three variants on protan vs. deutan (percent change, session 1) at 200
+independent seeds each, everything else held fixed. Result: **a corrected-
+significant cluster is found in 173/200 (size), 190/200 (weighted), and
+196/200 (directional) seeds** -- this is not a borderline, seed-sensitive
+result. The surviving cluster sits in the low-red/high-green corner of the
+grid (roughly red <= 1400, green >= 1300) and is consistently positive
+(protan's response higher than deutan's there).
+
+This sits alongside, not against, M6's `ramp_slope_red` finding (Welch
+p=0.44) and M10's PCA PC1 finding (p=0.092) for the same protan-vs-deutan
+question -- those are both single-scalar summaries of the *whole* grid
+(a linear slope, a leading principal component), and neither is built to
+detect a difference localized to one corner of it. The cluster-based test is
+exactly the tool for that. Read together: protan and deutan grids likely do
+differ, but in a spatially localized way that a whole-grid summary measure
+averages away -- worth carrying into any future subtype-outcome work, and a
+concrete lead for M12+ rather than treating protan-vs-deutan as flatly
+"not yet significant."
 
 ## `metadata.csv`: hand-edits are permanent, and preserved by default
 

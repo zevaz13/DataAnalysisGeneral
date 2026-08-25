@@ -1,7 +1,7 @@
 # Findings so far
 
 Hi! This is a guided tour of everything we've learned from the color-vision
-data so far, across all four ways we've looked at it. Nothing here is final
+data so far, across all five ways we've looked at it. Nothing here is final
 -- the point of this document is to give you a readable map of where things
 stand today, with a direct link to the notebook behind every claim, so you
 can open any of them, poke at the parameters, and push the story further
@@ -11,6 +11,11 @@ context, not a conclusion to take on faith.
 For the experimental background (what the stimulus is, why we're comparing
 these particular measures), see `docs/experiment_summary.md`. This document
 assumes that context and focuses on what we've actually found.
+
+The figures below are generated straight from the raw data, same as every
+number quoted around them -- `uv run python docs/make_figures.py`
+regenerates all of them (here and in `docs/experiment_summary.md`) if the
+underlying data or analysis changes.
 
 ## The shape of the project
 
@@ -56,6 +61,14 @@ edge cases rather than noise:
   test -- a hint your instinct about them was onto something, even before we
   touch the other two datasets.
 
+![Mean FM100 error profile, +/-1 SD, for HC, protan, deutan, and the two flagged subjects](figures/findings_fm100_groups_radial.png)
+
+*Protan and deutan both balloon out along the same axis (the classic
+red-green pattern), well past HC's tight center. The flagged pair
+(MET047 + MET021) sits between them and HC -- consistent with an elevated
+but non-red-green-specific error, exactly why they were flagged as
+different-deficiency candidates rather than folded into CVD.*
+
 ## 2. Behavioral: what your own clicks say
 
 `beh/notebooks/01_explore.ipynb`, `02_shape_features.ipynb`, `03_centroids.ipynb`
@@ -79,6 +92,13 @@ around it. The orientation of that line turned out to be remarkable:
 > literally the maximum possible -- every protan subject's line points one
 > way, every deutan subject's points another). That's the single strongest
 > finding of the whole project so far.
+
+![Every protan and deutan subject's click-cloud orientation, one point each](figures/findings_beh_orientation_separation.png)
+
+*Every subject reduced to two numbers: which way their click cloud points
+(x) and how tightly the clicks hug that line (y). The x-axis alone fully
+separates the two colors -- no protan point falls to the left of any deutan
+point.*
 
 M3 turned this into pictures: plotting each subject's own centroid, and
 each group's centroid with error bars, makes the same story visible at a
@@ -119,6 +139,14 @@ noisier than a button press. What holds up well:
   exactly the kind of check that keeps us from building a clinical claim on
   a number that just happens to be noisy.
 
+![HC, protan, and deutan mean SSVEP response grids, percent change from baseline](figures/findings_ssveps_gamut_groups.png)
+
+*The same red/green grid as every other figure here, but now the EEG's own
+response surface. HC's dip (paler patch) sits centrally, around red ~2100
+/ green ~900. Protan's and deutan's pale patches both stretch toward the
+grid's edge instead of sitting in the middle -- the visual version of
+"CVD subjects' troughs tend to lie beyond the sampled red range."*
+
 ## 4. Does the EEG test actually agree with what people click?
 
 `ssvepBeh/notebooks/01_explore.ipynb`, then `02_reliability.ipynb`
@@ -138,6 +166,13 @@ brain data even for people with no diagnosed deficiency, which is exactly
 the kind of subtle trend you were hoping to find a hint of. We double-checked
 this holds up across repeat EEG sessions too, and it does -- the numbers
 from session 1 and session 2 are nearly identical.
+
+![CVD group: EEG response grid next to behavioral click density, same axes](figures/findings_beh_eeg_overlap_cvd.png)
+
+*The CVD group's version of `docs/experiment_summary.md`'s HC figure --
+clicks (right) concentrate along the same diagonal band where the EEG
+response (left) is weakest, the pattern the spatial-overlap tests confirm
+statistically in every group, not just this one.*
 
 **Does a person's EEG-measured severity track their behavioral severity?**
 Here's the honest part: at first glance, yes -- your click-line orientation
@@ -243,6 +278,13 @@ resting on one strong measurement that might be a fluke, it's a pattern
 that's consistent enough across three completely independent ways of
 measuring the same thing that it survives one of them not lining up
 directly.
+
+![The three pairwise |circular correlation| values, with the joint concordance statistic marked](figures/findings_three_way_concordance.png)
+
+*FM100-vs-behavioral and FM100-vs-EEG each carry real signal on their own;
+behavioral-vs-EEG (right bar) is the weak edge, well below the joint
+statistic (dashed line) -- and still doesn't drag the joint test below
+significance.*
 
 We also spotted a new, specific lead worth keeping an eye on: within the
 protan group alone, that "empty" pairing (clicks vs. EEG) actually *does*

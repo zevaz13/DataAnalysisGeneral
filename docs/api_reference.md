@@ -220,6 +220,33 @@ worked analysis; this is the function reference.
   statistic's CI); called `n_boot` times, NaN replicates dropped before
   taking percentiles.
 
+### Rotated-dip fit and grid shape features (M11)
+
+See `docs/methods.md`'s M11 section and `16_grid_shape_features.ipynb` for
+the full worked analysis; this is the function reference.
+
+- **`fit_rotated_gaussian(grid, red_vals, green_vals, *, min_snr=2.0) -> dict`**
+  `{red, green, depth, amp, sigma_major, sigma_minor, orientation_deg,
+  r_squared, at_bound, fit_valid}` -- same ramp-plus-dip model as
+  `fit_ramp_gaussian`, but the dip is a rotated, anisotropic Gaussian
+  (`sigma_major`/`sigma_minor`/`orientation_deg` instead of axis-aligned
+  `sigma_red`/`sigma_green`). `orientation_deg` folded into `[0, 180)`,
+  matching `beh/scripts/features.py`'s `orientation_deg` convention. Purely
+  additive -- does not touch `fit_ramp_gaussian`, its bounds, or any
+  existing `subject_troughs.csv` column. Not part of `fit_trough_surface`'s
+  dispatch (its output schema is genuinely different, not a drop-in), called
+  directly by `subject_troughs` alongside `fit_ramp` instead, same pattern.
+  Same `at_bound`/`fit_valid` meaning as `fit_ramp_gaussian`; converges into
+  a *valid* fit less often on real data since it has one more parameter to
+  identify (90%/100% HC/PD vs. 25%/43% protan/deutan at session 1 --
+  `docs/methods.md`).
+- **`subject_troughs`'s rotated columns**: `rotated_red`, `rotated_green`,
+  `rotated_depth`, `rotated_amp`, `rotated_sigma_major`,
+  `rotated_sigma_minor`, `rotated_orientation_deg`, `rotated_r_squared`,
+  `rotated_at_bound`, `rotated_valid` -- added alongside the existing
+  `fitted_*`/`ramp_*` columns (unchanged), persisted in
+  `subject_troughs.csv` by `scripts/build_troughs.py` as before.
+
 ### Gain/shape decomposition (M8)
 
 See `docs/ssvep_analyses.md` proposal 4 and `10_gain_shape.ipynb` for the full
@@ -698,3 +725,39 @@ edit the variables called out below and rerun from that cell down.
   protan vs. deutan (p=0.092, not significant, exploratory). *Edit:*
   `SESSION` (top cell); `n_perm` on `permutation_component_count` to trade
   precision for runtime.
+- **`13_hc_vs_pd.ipynb`** -- M11: side-by-side raw/percent grids, a
+  `permutation_test_size` difference map (raw and percent), and a
+  `ramp_slope_red` boxplot + Mann-Whitney U for HC vs. PD (subject-level,
+  the number the significance claim rests on), plus a pixel-level pooled
+  boxplot shown as descriptive context only. Currently not significant
+  (p=0.89) -- consistent with PD being underpowered/not different from CTR
+  everywhere else in this project. *Edit:* `SESSION`, `categories` (top
+  cell).
+- **`14_hc_vs_subtypes.ipynb`** -- M11: same structure as `13_hc_vs_pd.ipynb`,
+  three-way (HC/protan/deutan) with all three pairwise
+  `ramp_slope_red` Mann-Whitney comparisons, uncorrected (matching `beh/`'s
+  own M1 convention for its five pairwise tests). Currently HC vs. protan
+  (p=0.0019) and HC vs. deutan (p=0.048) are significant; protan vs. deutan
+  is not (p=0.69) on this measure -- see `13_hc_vs_pd.ipynb`'s sibling note
+  in `15_permutation_stability.ipynb` for why that doesn't mean the two
+  subtypes' grids don't differ. *Edit:* `SESSION` (top cell).
+- **`15_permutation_stability.ipynb`** -- M11: re-runs all three
+  `permutation_test_*` variants on protan vs. deutan at 200 independent
+  seeds each, to check whether "significant" is stable or seed-dependent.
+  **Currently a corrected-significant cluster is found in 173-196 of 200
+  seeds** (86.5%-98% depending on variant) -- not a fluke, and a previously
+  under-surfaced result (the same test at a single seed already found this
+  in `05_permutation_testing.ipynb`, but it was never carried into
+  `PLANssveps.md`'s M3/M6 write-ups). See `docs/methods.md`'s M3 section for
+  the surviving cluster's location and how this reconciles with
+  `ramp_slope_red`/PCA PC1's non-significant results for the same pair.
+  *Edit:* `N_SEEDS`, `COMMON` (top cell) for a different comparison or seed
+  count.
+- **`16_grid_shape_features.ipynb`** -- M11: `analysis.fit_rotated_gaussian`
+  (new, purely additive) applied to every session-1 subject; convergence-
+  into-a-valid-fit rate by group, a `rotated_orientation_deg` vs.
+  `rotated_sigma_major` scatter (the direct analog of `beh/notebooks/
+  02_shape_features.ipynb`'s `plot_feature_space`), and per-feature
+  Mann-Whitney U for protan vs. deutan. Currently **not enough valid fits to
+  run that comparison** (2/8 protan, 3/7 deutan pass `rotated_valid`) --
+  see `docs/methods.md`'s M11 section for why. *Edit:* `SESSION` (top cell).

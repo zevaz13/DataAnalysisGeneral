@@ -391,6 +391,100 @@ def fit_ramp_gaussian(grid: np.ndarray, red_vals: list[float], green_vals: list[
     }
 
 
+def fit_rotated_gaussian(grid: np.ndarray, red_vals: list[float], green_vals: list[float], *, min_snr: float = 2.0) -> dict:
+    """Fit a linear ramp plus one rotated, anisotropic Gaussian dip:
+
+        z = c0 + c1*x + c2*y - amp * exp(-(xr^2/(2*sigma_major^2) + yr^2/(2*sigma_minor^2)))
+        xr =  (x - x0) * cos(theta) + (y - y0) * sin(theta)
+        yr = -(x - x0) * sin(theta) + (y - y0) * cos(theta)
+
+    fit_ramp_gaussian's dip is axis-aligned (sigma_red, sigma_green
+    independently, no tilt). M11's grid-shape-metric brainstorm
+    (PLANssveps.md) asks whether a subject's dip is actually tilted relative
+    to the red/green grid axes -- something an axis-aligned model can never
+    express. Purely additive: does not touch fit_ramp_gaussian or any of its
+    bounds/behavior/persisted columns.
+
+    Fit in native (red, green) units, deliberately not rescaled to
+    comparable variance first -- the same choice beh/scripts/features.py's
+    subject_shape_features makes on the behavioral click cloud, and for the
+    same reason: the physical stimulus space itself is what's meaningful
+    here. This also keeps orientation_deg on the same footing as beh's own
+    orientation_deg, for a later cross-modality comparison via
+    ssvep_beh_fm100/scripts/type_axis.py.
+
+    theta is bounded to [0, pi) during the fit; sigma_major/sigma_minor are
+    canonicalized after fitting (swapped, with theta rotated 90deg, if the
+    fit put the larger sigma second) so "major" always means "the longer
+    axis" and orientation_deg is folded into [0, 180) -- mirroring beh's own
+    orientation_deg convention (an ellipse's major axis has no intrinsic
+    direction).
+
+    Same two quality flags as fit_ramp_gaussian, same meaning: at_bound (a
+    parameter pegged against its bound) and fit_valid (amp above min_snr
+    times the residual SD, and not at_bound). One additional caveat specific
+    to this model: orientation_deg is poorly identified as sigma_major
+    approaches sigma_minor (a nearly circular dip has no well-defined tilt)
+    -- read it cautiously when sigma_major/sigma_minor is close to 1.
+    """
+    x, y = np.meshgrid(red_vals, green_vals, indexing="ij")
+    x, y, z = x.ravel(), y.ravel(), grid.ravel()
+    red_span, green_span = np.ptp(red_vals), np.ptp(green_vals)
+    sigma_lower = min(red_span, green_span) / 20
+    sigma_upper = float(np.hypot(red_span, green_span))
+
+    def model(xy, c0, c1, c2, amp, x0, y0, sigma_major, sigma_minor, theta):
+        xx, yy = xy
+        dx, dy = xx - x0, yy - y0
+        xr = dx * np.cos(theta) + dy * np.sin(theta)
+        yr = -dx * np.sin(theta) + dy * np.cos(theta)
+        return c0 + c1 * xx + c2 * yy - amp * np.exp(-(xr**2 / (2 * sigma_major**2) + yr**2 / (2 * sigma_minor**2)))
+
+    seed = trough_location(grid, red_vals, green_vals)
+    p0 = [z.mean(), 0.0, 0.0, max(z.mean() - seed["depth"], 1e-9), seed["red"], seed["green"], red_span / 4, green_span / 4, 0.0]
+    lower = [-np.inf, -np.inf, -np.inf, 0.0, min(red_vals), min(green_vals), sigma_lower, sigma_lower, 0.0]
+    upper = [np.inf, np.inf, np.inf, np.inf, max(red_vals), max(green_vals), sigma_upper, sigma_upper, np.pi]
+
+    try:
+        params, _ = curve_fit(model, (x, y), z, p0=np.clip(p0, lower, upper), bounds=(lower, upper), maxfev=20000)
+    except RuntimeError:
+        nan = float("nan")
+        return {"red": nan, "green": nan, "depth": nan, "amp": nan, "sigma_major": nan,
+                "sigma_minor": nan, "orientation_deg": nan, "r_squared": nan, "at_bound": False, "fit_valid": False}
+
+    c0, c1, c2, amp, x0, y0, sigma_major, sigma_minor, theta = params
+    residuals = z - model((x, y), *params)
+    r_squared = 1 - np.sum(residuals**2) / np.sum((z - z.mean()) ** 2)
+    depth = c0 + c1 * x0 + c2 * y0 - amp
+
+    if sigma_minor > sigma_major:
+        sigma_major, sigma_minor = sigma_minor, sigma_major
+        theta += np.pi / 2
+    orientation_deg = float(np.degrees(theta) % 180)
+
+    tol_red, tol_green = red_span * 1e-3, green_span * 1e-3
+    tol_sigma = (sigma_upper - sigma_lower) * 1e-3
+    at_bound = bool(
+        min(abs(x0 - min(red_vals)), abs(x0 - max(red_vals))) < tol_red
+        or min(abs(y0 - min(green_vals)), abs(y0 - max(green_vals))) < tol_green
+        or min(abs(sigma_major - sigma_lower), abs(sigma_major - sigma_upper)) < tol_sigma
+        or min(abs(sigma_minor - sigma_lower), abs(sigma_minor - sigma_upper)) < tol_sigma
+    )
+
+    return {
+        "red": x0,
+        "green": y0,
+        "depth": depth,
+        "amp": amp,
+        "sigma_major": sigma_major,
+        "sigma_minor": sigma_minor,
+        "orientation_deg": orientation_deg,
+        "r_squared": r_squared,
+        "at_bound": at_bound,
+        "fit_valid": bool(amp > min_snr * residuals.std() and not at_bound),
+    }
+
+
 def fit_ramp(grid: np.ndarray, red_vals: list[float], green_vals: list[float]) -> dict:
     """Fit z = c0 + c1*x + c2*y -- the ramp term alone, no dip -- via linear
     least squares. Where fit_ramp_gaussian pegs a subject's dip against the
@@ -532,7 +626,14 @@ def subject_troughs(
     interior minimum to fail to find. This is what makes CVD subjects whose
     trough lies beyond the sampled red range still usable: ramp_slope_red is
     the continuous measure to compare across all of them (see
-    docs/ssvep_analyses.md proposal 2 and 08_cvd_gamut.ipynb)."""
+    docs/ssvep_analyses.md proposal 2 and 08_cvd_gamut.ipynb).
+
+    Also adds a rotated-dip fit (fit_rotated_gaussian, M11): rotated_red,
+    rotated_green, rotated_depth, rotated_amp, rotated_sigma_major,
+    rotated_sigma_minor, rotated_orientation_deg, rotated_r_squared,
+    rotated_at_bound, rotated_valid -- the axis-aligned fitted_* columns'
+    tilted counterpart, added purely alongside them (fitted_*/ramp_* are
+    unchanged by this addition)."""
     red_vals, green_vals = load_grid_axes()
     rows = []
     for meta in metadata_df.to_dict("records"):
@@ -540,6 +641,7 @@ def subject_troughs(
         loc = trough_location(grid, red_vals, green_vals)
         fit = fit_trough_surface(grid, red_vals, green_vals, method=surface_method)
         ramp = fit_ramp(grid, red_vals, green_vals)
+        rotated = fit_rotated_gaussian(grid, red_vals, green_vals)
         rows.append(
             {
                 "sub_id": meta["sub_id"],
@@ -560,6 +662,16 @@ def subject_troughs(
                 "ramp_slope_red": ramp["slope_red"],
                 "ramp_slope_green": ramp["slope_green"],
                 "ramp_r_squared": ramp["r_squared"],
+                "rotated_red": rotated["red"],
+                "rotated_green": rotated["green"],
+                "rotated_depth": rotated["depth"],
+                "rotated_amp": rotated["amp"],
+                "rotated_sigma_major": rotated["sigma_major"],
+                "rotated_sigma_minor": rotated["sigma_minor"],
+                "rotated_orientation_deg": rotated["orientation_deg"],
+                "rotated_r_squared": rotated["r_squared"],
+                "rotated_at_bound": rotated["at_bound"],
+                "rotated_valid": rotated["fit_valid"],
             }
         )
     return pd.DataFrame(rows)
