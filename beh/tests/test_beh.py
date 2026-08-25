@@ -25,6 +25,7 @@ import comparisons  # noqa: E402
 import features  # noqa: E402
 import loader  # noqa: E402
 import plotting  # noqa: E402
+import retest  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -293,3 +294,133 @@ def test_plot_feature_group_centroids_one_marker_per_category(df):
     ax = plotting.plot_feature_group_centroids(df, categories)
     _, labels = ax.get_legend_handles_labels()
     assert len(labels) == len(categories)
+
+
+# --- features: per-session features, outlier ellipse (M4) -----------------
+
+
+def test_subject_session_features_one_row_per_subject_session(df):
+    result = features.subject_session_features(df[df["sub_id"] == "MET001"])
+    n_sessions = df.loc[df["sub_id"] == "MET001", "session"].nunique()
+    assert len(result) == n_sessions
+    assert set(result.columns) == {"sub_id", "session", "centroid_red", "centroid_green", "orientation_deg", "along_var", "perp_var", "n"}
+
+
+def test_subject_session_features_centroid_matches_manual_mean(df):
+    result = features.subject_session_features(df[df["sub_id"] == "MET001"])
+    for _, row in result.iterrows():
+        expected = df[(df["sub_id"] == "MET001") & (df["session"] == row["session"])][["red", "green"]].mean()
+        assert row["centroid_red"] == pytest.approx(expected["red"])
+        assert row["centroid_green"] == pytest.approx(expected["green"])
+
+
+def test_subject_session_features_skips_sessions_with_fewer_than_two_points():
+    synth = pd.DataFrame({"sub_id": ["A1", "A1", "A1"], "session": [1, 1, 2], "red": [500, 520, 500], "green": [500, 480, 500]})
+    result = features.subject_session_features(synth)
+    assert list(result["session"]) == [1]  # session 2 has only 1 point, dropped
+
+
+def test_within_session_scatter_is_zero_for_identical_clicks():
+    synth = pd.DataFrame({"sub_id": ["A1"] * 4, "session": [1, 1, 2, 2], "red": [500, 500, 700, 700], "green": [500, 500, 700, 700]})
+    assert features.within_session_scatter(synth, "A1") == pytest.approx(0.0)
+
+
+def test_within_session_scatter_averages_sessions_equally():
+    """One session with 2 points at distance 10 from their centroid, one
+    session with 10 points at distance 100 -- averaging per-session first
+    (not pooling all points) should land near (10+100)/2, not be dragged
+    toward 100 by the larger session's point count."""
+    rng = np.random.default_rng(0)
+    session1 = pd.DataFrame({"sub_id": "A1", "session": 1, "red": [490, 510], "green": [500, 500]})
+    angles = rng.uniform(0, 2 * np.pi, 10)
+    session2 = pd.DataFrame({"sub_id": "A1", "session": 2, "red": 700 + 100 * np.cos(angles), "green": 700 + 100 * np.sin(angles)})
+    synth = pd.concat([session1, session2], ignore_index=True)
+    # (10 + ~93.8) / 2 -- session2's RMS-to-its-own-sample-centroid isn't
+    # exactly 100 at n=10 points, computed directly rather than assumed.
+    assert features.within_session_scatter(synth, "A1") == pytest.approx(51.9, abs=0.5)
+
+
+def test_outlier_mask_flags_points_beyond_n_std_along_each_axis():
+    # A perfectly axis-aligned synthetic cloud: pc1 along red, pc2 along green,
+    # so the ellipse boundary is exactly known in raw (red, green) units.
+    rng = np.random.default_rng(0)
+    red = rng.normal(0, 100, 200)
+    green = rng.normal(0, 20, 200)
+    points = np.column_stack([red, green])
+    pca = features._points_pca(points)
+
+    n_std = 2.0
+    clearly_inside = np.array([[0.0, 0.0], [50.0, 5.0]])
+    clearly_outside = np.array([[100.0 * n_std * 3, 0.0], [0.0, 20.0 * n_std * 3]])
+    assert not features.outlier_mask(pca, clearly_inside, n_std=n_std).any()
+    assert features.outlier_mask(pca, clearly_outside, n_std=n_std).all()
+
+
+def test_subject_outliers_flags_a_planted_outlier():
+    rng = np.random.default_rng(0)
+    n = 40
+    inliers = pd.DataFrame({"sub_id": "A1", "red": 1000 + rng.normal(0, 50, n), "green": 1000 + rng.normal(0, 50, n)})
+    outlier = pd.DataFrame({"sub_id": "A1", "red": [1000 + 2000], "green": [1000 + 2000]})
+    synth = pd.concat([inliers, outlier], ignore_index=True)
+    result = features.subject_outliers(synth, "A1", n_std=2.0)
+    assert result["outlier_mask"][-1]  # the planted point
+    assert result["outlier_mask"].sum() < n  # most of the tight cluster stays inside
+
+
+def test_group_outliers_table_has_one_row_per_click(df):
+    result = features.group_outliers(df, group="PD", n_std=2.0)
+    assert len(result["table"]) == len(df[df["group"] == "PD"])
+    assert set(result["table"]["sub_id"]) == set(loader.subjects_in_group(df, group="PD"))
+    assert result["table"]["is_outlier"].dtype == bool
+
+
+# --- retest.py: cross-session feature reliability (M4) --------------------
+
+
+def test_paired_subjects_requires_both_sessions(df):
+    paired = retest.paired_subjects(df, group="CTR")
+    session1 = set(loader.subjects_in_group(df[df["session"] == 1], group="CTR"))
+    session2 = set(loader.subjects_in_group(df[df["session"] == 2], group="CTR"))
+    assert set(paired) == session1 & session2
+    assert len(paired) > 0
+
+
+def test_reliability_table_returns_all_five_features(df):
+    result = retest.reliability_table(df, group="CTR")
+    assert set(result["feature"]) == {"centroid_red", "centroid_green", "along_var", "perp_var", "orientation_deg"}
+    angle_row = result[result["feature"] == "orientation_deg"].iloc[0]
+    assert angle_row["statistic"] == "circ_r"
+    assert (result[result["feature"] != "orientation_deg"]["statistic"] == "icc").all()
+    assert result["value"].between(-1, 1).all()
+
+
+def test_reliability_table_raises_below_three_paired_subjects(df):
+    with pytest.raises(ValueError):
+        retest.reliability_table(df, group="HD")  # n=1 subject total
+
+
+# --- plotting: outlier ellipse (M4) ----------------------------------------
+
+
+def test_plot_subject_outliers_draws_two_series_and_an_ellipse(df):
+    ax = plotting.plot_subject_outliers(df, "MET001")
+    assert len(ax.collections) == 2  # inliers, outliers (one may be empty)
+    assert len(ax.patches) == 1
+
+
+def test_plot_subject_outliers_shared_pca_draws_the_same_ellipse_everywhere(df):
+    shared = features.group_outliers(df, group="PD", n_std=2.0)["pca"]
+    ax1 = plotting.plot_subject_outliers(df, "MET025", pca=shared)
+    ax2 = plotting.plot_subject_outliers(df, "MET030", pca=shared)
+    e1, e2 = ax1.patches[0], ax2.patches[0]
+    assert (e1.width, e1.height, e1.angle) == (e2.width, e2.height, e2.angle)
+    assert tuple(e1.center) == tuple(e2.center)
+
+
+def test_plot_subjects_outliers_grid_wraps_at_max_panel_cols(df):
+    sub_ids = loader.subjects_in_group(df, subgroup="protan")  # 8 subjects
+    fig = plotting.plot_subjects_outliers_grid(df, sub_ids=sub_ids)
+    rows, cols = fig.axes[0].get_subplotspec().get_gridspec().get_geometry()
+    assert (rows, cols) == (2, plotting.MAX_PANEL_COLS)
+    visible = [ax for ax in fig.axes if ax.axison]
+    assert len(visible) == len(sub_ids)

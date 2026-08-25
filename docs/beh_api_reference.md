@@ -72,6 +72,22 @@ identity in hue -- see `beh/README.md`.
 (`features.subject_pca_line`), in `FIT_LINE_COLOR` (secondary ink, since
 it's a derived overlay, not a data series).
 
+- **`plot_subject_outliers(df, sub_id, *, n_std=2.0, pca=None, xlim=XLIM, ylim=YLIM, ax=None) -> Axes`** (M4)
+  One subject's clicks, colored by whether they fall outside a fitted
+  ellipse at `n_std` standard deviations along each principal axis
+  (`OUTLIER_COLOR`, the same validated slot as `SESSION_COLORS[1]`, for
+  outliers; `POINT_COLOR` for inliers), with the ellipse itself drawn
+  (`FIT_LINE_COLOR`, dashed). `pca=None` (default): fit the ellipse to this
+  subject's own points (the per-participant check). `pca=<a
+  group_outliers result's "pca">`: classify this subject's points against
+  a shared group/subgroup ellipse instead -- the group-level check.
+- **`plot_subjects_outliers_grid(df, *, sub_ids=None, group=None, subgroup=None, n_std=2.0, shared_pca=None, xlim=XLIM, ylim=YLIM) -> Figure`** (M4)
+  One panel per subject (`plot_subject_outliers`), wrapped to
+  `MAX_PANEL_COLS`. `shared_pca=None`: each panel fits its own subject's
+  ellipse. `shared_pca=<group_outliers(...)["pca"]>`: every panel draws
+  the same shared ellipse, classifying each subject's own points against
+  it -- one call serves both the per-participant and group-level checks.
+
 - **`plot_subject_centroids(df, categories, *, xlim=XLIM, ylim=YLIM, ax=None) -> Axes`**
   M3: one point per subject, at that subject's own mean (red, green) --
   `comparisons.group_points(..., unit='subject')`'s points, plotted
@@ -118,6 +134,76 @@ compares groups on the shape of that fit.
   Gaussian. Note: orientation comparisons assume a group's angles don't
   straddle the 0/180 wrap point -- true for this dataset (see `features.py`
   module docstring) but not a general circular-safe statistic.
+
+### M4 additions: per-session features, click consistency, outlier ellipse
+
+- **`subject_session_features(df) -> DataFrame`**
+  `subject_shape_features` plus centroid, computed **per (sub_id, session)**
+  rather than pooled across a subject's sessions like `subject_shape_features`/
+  `group_features` (M2) do. One row per (sub_id, session) with `>= 2` clicks:
+  `sub_id, session, centroid_red, centroid_green, orientation_deg, along_var,
+  perp_var, n`. What `retest.py`'s reliability check needs -- a reliability
+  check is meaningless on features already pooled across the sessions being
+  compared.
+- **`within_session_scatter(df, sub_id) -> float`**
+  A subject's average within-session click consistency: for each of their
+  sessions, the RMS Euclidean distance of that session's clicks to that
+  session's own centroid, averaged across sessions (each session weighted
+  equally). Answers "how much does this subject's hand wander within one
+  sitting" -- distinct from *where* they aim (location) or their overall
+  click-cloud shape pooled across sessions (M2's features), and the reason
+  it exists: PD's motor symptoms could plausibly inflate this without
+  moving either of those (`05_hc_vs_pd.ipynb`).
+- **`outlier_mask(pca, points, *, n_std=2.0) -> ndarray[bool]`**
+  Which rows of `points` fall outside the ellipse at `n_std` standard
+  deviations along each of `pca`'s principal axes (`pca` is a
+  `_points_pca`/`_subject_pca`-shaped dict: `mean`, `pc1`, `along_var`,
+  `perp_var`). `pca` and `points` need not come from the same subject/group
+  -- `group_outliers` applies one shared group-level `pca` to each
+  individual subject's own `points`.
+- **`subject_outliers(df, sub_id, *, n_std=2.0) -> dict`**
+  One subject's own points classified against their own fitted ellipse.
+  Returns `{pca, points, outlier_mask}`.
+- **`group_outliers(df, *, group=None, subgroup=None, n_std=2.0) -> dict`**
+  One ellipse fit to a whole group/subgroup's pooled clicks, then applied
+  back to each individual subject's own points -- "does this subject's data
+  look like an outlier relative to the group as a whole", not relative to
+  their own cloud. Returns `{pca, table}`: `pca` is the group-level fit (for
+  drawing the shared ellipse); `table` has one row per click (`sub_id, red,
+  green, is_outlier`) across every subject in the group, groupable by
+  `sub_id` to see how many of a given subject's points were flagged.
+
+## `retest.py` -- cross-session feature reliability (M4)
+
+Deliberately not named `reliability.py` -- `ssveps/scripts/` already has
+one, and this module needs to import that one under the same bare name it
+would otherwise claim for itself (a genuine self-collision, not the usual
+cross-project one; see the module docstring). Mirrors
+`ssvep_beh_fm100/scripts/fm100_features.py`'s `paired_sessions`/
+`reliability_table` structure closely, reusing `ssveps/scripts/reliability.py`'s
+`feature_icc` directly rather than reimplementing ICC.
+
+`MAGNITUDE_FEATURES = ["centroid_red", "centroid_green", "along_var", "perp_var"]`,
+`ANGLE_FEATURE = "orientation_deg"` (periodic, folds to `[0, 180)` -- checked
+with `pingouin.circ_corrcc` after `circ_axial` folding, not a linear ICC,
+same split `fm100_features.py` makes for `VKS_Angle`).
+
+- **`paired_subjects(df, *, group=None, subgroup=None, sessions=(1, 2)) -> list[str]`**
+  Subject IDs present at both of `sessions` (default session 1 and session
+  2, not "any 2 sessions" -- keeps results comparable across subjects with
+  a differing total session count, same convention
+  `ssveps/scripts/reliability.py`'s own `paired_subjects` uses), optionally
+  filtered by group/subgroup.
+- **`paired_sessions(df, *, group=None, subgroup=None, sessions=(1, 2)) -> DataFrame`**
+  Centroid/shape features for `paired_subjects`, one row per subject, each
+  feature suffixed `_session{n}`. Raises `ValueError` below 3 qualifying
+  subjects (`feature_icc`'s own minimum).
+- **`reliability_table(df, *, group=None, subgroup=None, sessions=(1, 2)) -> DataFrame`**
+  ICC(A,1) for the four `MAGNITUDE_FEATURES`, `circ_corrcc` for
+  `orientation_deg`. Returns `feature, n, statistic ('icc'|'circ_r'), value,
+  p_value` -- same shape as `fm100_features.reliability_table`, so
+  `ssvep_beh_fm100/scripts/plotting.py`'s `plot_reliability_table` is
+  directly reusable on the result (`04_reliability.ipynb` does this).
 
 ## `comparisons.py` -- Hotelling T² group comparisons
 
@@ -196,3 +282,28 @@ Each opens with `sys.path.append('../scripts')`, so run them with
   pairwise combinations of `orientation_deg`, `along_var`, `perp_var`.
   *Edit:* `top_level_categories`/`subtype_categories`/`all_categories` to
   look at different group sets.
+- **`04_reliability.ipynb`** -- M4: `retest.reliability_table` for HC and
+  PD (CVD excluded -- most subjects lack a second session), plotted via
+  `ssvep_beh_fm100/scripts/plotting.py`'s `plot_reliability_table` (reused
+  cross-project, no new chart code). HC is mostly not reliable
+  session-to-session (only `centroid_green` clears significance, ICC=0.60,
+  p=0.0013); PD (n=6) has nothing significant either, at a sample size too
+  small to confirm its own suggestively high point estimates. *Edit:*
+  `group=`/`subgroup=` on the `reliability_table` calls for a different
+  category (will raise below 3 paired subjects).
+- **`05_hc_vs_pd.ipynb`** -- M4: point clouds side by side, Hotelling T²
+  (p=0.0001, matching M1's earlier number), all three `compare_shape_feature`
+  tests (all significant for this pair), and `within_session_scatter`
+  compared via `pingouin.mwu` -- PD is significantly less consistent within
+  a single sitting (p=0.023, ~70% larger RMS scatter than HC), a specific
+  answer to whether PD's motor symptoms show up as noisier clicking. *Edit:*
+  `categories` (top cell) for a different pair -- note `within_session_scatter`'s
+  motor-symptom framing is PD-specific, not a generic template for any pair.
+- **`06_outlier_rejection.ipynb`** -- M4: `plotting.plot_subjects_outliers_grid`
+  at `n_std=2.0`, per-subject (each panel its own ellipse) then group-level
+  (`features.group_outliers`'s `pca` shared across every panel), for
+  HC/PD/protan/deutan. Flagged fractions are similar and unremarkable
+  across every group (10.5%-15.5% of clicks) -- exploratory, nothing here
+  filters persisted data, and nothing turned up that argues for adding
+  automatic rejection to the pipeline. *Edit:* `N_STD`, `categories` (top
+  cell).

@@ -39,11 +39,46 @@ section 2.
 Confirms M1/M2 visually; deutan is the least internally-consistent group by
 far. See `docs/findings.md` section 2.
 
-### M4. 
-- [ ] A notebook that explore the test-retest reliability ICCs for behavioral map features. Lets leave CVD participants out, since they have not done the experiment more than 1 (most of them) .
-- [ ] Make a notbeook that plots and compares PD vs HC. Compare their resulting maps side to side, their features and explores statistical comparisons worth considering to address the differences between these groups.
-- [ ] Lets find outlier clicks. I want to do this per participant first, fitting a rotated ellipse to the distribution of each participant's data. Leave out points that are 2 stds away from centroid. This could be a parameter. For now, I just want to see in a plot for all participants as a grid, their distribution of points, the fitted ellipse with the desired std, and with a different color, the points out of that ellipse. 
-- [ ] Implement a group/subgroup specific outlier rejection routine. We fit a rotated ellipse to the distribution of each group/subgroup, and flag the points we leave out. We can apply these rejection to each individual in the sample and then put them all together. Plotting should be done similar as the item above.
+### M4. Reliability, HC vs PD, outlier ellipse
+
+- [x] **`04_reliability.ipynb`** -- cross-session ICC/circular-r for
+  centroid + M2 shape features, HC and PD only (CVD excluded: 6/7 deutan
+  and 6/8 protan have only 1 session). New `beh/scripts/retest.py`, reusing
+  `ssveps/scripts/reliability.py`'s `feature_icc` directly.
+  **HC (n=21 paired) is mostly not reliable session-to-session** -- only
+  `centroid_green` clears significance (ICC=0.60, p=0.0013); `centroid_red`,
+  `along_var`, `perp_var`, `orientation_deg` all non-significant. **PD
+  (n=6) has nothing significant either**, though `along_var`
+  (ICC=0.58)/`orientation_deg` (circular r=0.76) are suggestively high at a
+  sample size too small to confirm it. Doesn't contradict M2's headline
+  `orientation_deg` finding (that used clicks pooled across all of a
+  subject's sessions, a different and more forgiving question) but is a
+  real caveat worth carrying forward before treating any single session's
+  features as individually trustworthy.
+- [x] **`05_hc_vs_pd.ipynb`** -- point clouds, Hotelling T² (p=0.0001,
+  matches M1's number), all three shape features (all significant for this
+  pair: orientation_deg p=0.006, along_var p=0.034, perp_var p=0.030), plus
+  a new PD-specific check: `features.within_session_scatter` (click
+  consistency within one sitting). **PD is significantly less consistent
+  within a session** (Mann-Whitney p=0.023, ~70% larger RMS scatter than
+  HC, 552 vs 320) -- a specific, confirmed answer to whether PD's motor
+  symptoms show up as noisier clicking rather than (or alongside) a shifted
+  match point.
+- [x] **`06_outlier_rejection.ipynb`** -- new outlier-ellipse machinery in
+  `features.py` (`outlier_mask`, `subject_outliers`, `group_outliers`) and
+  `plotting.py` (`plot_subject_outliers`/`plot_subjects_outliers_grid`,
+  `n_std=` parameter, default 2.0). Per-participant (each subject's own
+  ellipse) and group-level (one shared group/subgroup ellipse, applied back
+  to every individual subject) versions, sharing one plotting function via
+  a `shared_pca=` override. **Flagged fractions are similar and
+  unremarkable across every group** (HC 12.6%, PD 15.5%, protan 10.5%,
+  deutan 11.5% of clicks) and nearly every subject has at least one point
+  flagged, which is expected at `n_std=2.0` with ~20-60 clicks per subject,
+  not a sign of a systematic problem in any one group. Purely exploratory
+  -- nothing here filters persisted data. Read as an honest "nothing
+  alarming turned up" rather than a case for adding automatic rejection to
+  the pipeline by default.
+
 ## Next milestones
 
 To be defined together.

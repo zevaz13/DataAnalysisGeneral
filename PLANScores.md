@@ -30,6 +30,11 @@ is available.
 this on the real data. See `docs/findings.md` section 1 for the MET047/MET021
 headline findings.
 
+## M2. 
+- [ ] For the radar plots, we should add the possibility of changing the numbers around it. by default, we can use the angles (which has clear interpretation). However, the test usually is presented with the cap number instead. [85 1: 84], notice that the vector starts with 85, instead of 1. 
+- [ ] Make FM100 group comparisons between groups. We should compare the features CTR vs PD, HC vs protan, HC vs deutan, protan vs deutan.
+- [ ] I want to see specific plots for MET020, MET047, MET021.
+- [ ] Make specific plots between HC and PD. and lets quantify the dc offset between the groups, PD looks like HC + a number, when compared. 
 ## Next milestones
 
 To be defined together.

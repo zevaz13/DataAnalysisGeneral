@@ -65,6 +65,27 @@ Raw column -> tidy column, renamed for consistency with `ssveps/`'s naming:
   `plot_group_centroids` (each subject's, or each group's, own mean (red,
   green) as a single point) and `plot_feature_group_centroids` (the same for
   shape features) -- see below.
+- `scripts/features.py` also gained (M4) `subject_session_features`
+  (per-(sub_id, session), not pooled -- what a reliability check needs),
+  `within_session_scatter` (a subject's own click consistency within a
+  sitting), and the outlier-ellipse machinery: `outlier_mask`,
+  `subject_outliers` (a subject's own fitted ellipse), `group_outliers`
+  (one ellipse fit to a whole group/subgroup, applied back to every
+  individual subject).
+- `scripts/retest.py` -- M4: cross-session reliability (ICC(A,1) for
+  centroid/`along_var`/`perp_var`, `pingouin.circ_corrcc` for the periodic
+  `orientation_deg`), reusing `ssveps/scripts/reliability.py`'s
+  `feature_icc` directly rather than reimplementing ICC. **Not named
+  `reliability.py`** -- `ssveps/scripts/` already has one, and this file
+  needs to import that one under the same bare name it would otherwise
+  claim for itself (a genuine self-collision, not just the usual
+  cross-project one -- see the module docstring).
+- `scripts/plotting.py` also gained (M4) `plot_subject_outliers`/
+  `plot_subjects_outliers_grid` -- the outlier-ellipse visualization, with
+  an optional `shared_pca=`/`pca=` override so the same grid function
+  renders both the per-subject and the group-level check (pass
+  `group_outliers`'s `"pca"` to classify each subject's own points against
+  a shared group ellipse instead of their own).
 
 ## Tests
 
@@ -77,6 +98,11 @@ importing its own, so collection order can't leak the wrong project's
 module into the other's tests. Notebooks never hit this: each runs in its
 own kernel process, so `sys.path.append('../scripts')` + `import loader` is
 unambiguous there regardless of what any other notebook does.
+
+`scripts/retest.py` is deliberately not named `test_*.py`/`*_test.py` --
+pytest's default discovery would otherwise try to collect it as a test
+module in its own right (it lives under `scripts/`, not `tests/`, so
+nothing currently scopes discovery away from it).
 
 ## Notebooks
 
@@ -97,3 +123,21 @@ Each opens with `sys.path.append('../scripts')`, so run them with
 - `03_centroids.ipynb` -- M3: per-subject and per-group centroid plots, in
   both (red, green) space and shape-feature space (all three feature
   pairings).
+- `04_reliability.ipynb` -- M4: cross-session ICC/circular-r for centroid
+  and shape features, HC and PD only (CVD mostly lacks a second session).
+  HC is mostly not reliable session-to-session (only `centroid_green`
+  clears significance); PD (n=6) has no significant feature either, at a
+  sample size too small to confirm the suggestively high `along_var`/
+  `orientation_deg` point estimates.
+- `05_hc_vs_pd.ipynb` -- M4: point clouds, Hotelling T², per-feature shape
+  comparisons for HC vs PD (all significant), plus a PD-specific
+  within-session click-consistency check -- PD is significantly less
+  consistent within a single sitting (p=0.023, ~70% larger RMS scatter),
+  a specific, confirmed answer to whether PD's motor symptoms show up as
+  noisier clicking rather than (or in addition to) a shifted match point.
+- `06_outlier_rejection.ipynb` -- M4: a fitted rotated ellipse (PCA) flags
+  points beyond `n_std` (default 2.0) standard deviations, per-subject and
+  group-level (one shared ellipse per group, applied to every individual).
+  Nothing here filters persisted data -- exploratory, and nothing alarming
+  turned up (flagged fractions are similar and unremarkable across every
+  group).

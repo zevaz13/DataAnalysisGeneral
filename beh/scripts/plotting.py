@@ -21,14 +21,16 @@ uses for its boxplots.
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.patches import Ellipse
 
 from comparisons import group_points
-from features import group_features, subject_pca_line
+from features import group_features, outlier_mask, subject_outliers, subject_pca_line
 from loader import subjects_in_group
 
 POINT_COLOR = "#2a78d6"
 SESSION_COLORS = ["#2a78d6", "#eb6834", "#1baf7a"]  # validated all-pairs for scatter, up to 3 categories
 FIT_LINE_COLOR = "#52514e"  # secondary ink, not a categorical slot: this is a derived overlay, not a series
+OUTLIER_COLOR = SESSION_COLORS[1]  # same validated all-pairs slot as session 2 -- outlier/inlier is a 2-category scatter too
 # Full 8-hue categorical order (dataviz skill's default palette), for the centroid
 # plots below -- those are a handful of large, legended, well-separated marks, not
 # a dense point cloud, so past 3 categories identity is carried by CENTROID_MARKERS
@@ -184,6 +186,85 @@ def plot_subjects_grid(
         plot_subject_cloud(df, sub_id, xlim=xlim, ylim=ylim, show_fit=show_fit, ax=ax)
     subtitle = ", ".join(filter(None, [group, subgroup])) or f"{len(sub_ids)} subjects"
     fig.suptitle(subtitle)
+    fig.tight_layout()
+    return fig
+
+
+def _draw_ellipse(ax: plt.Axes, pca: dict, *, n_std: float) -> None:
+    """The outlier boundary itself: an ellipse centered at pca['mean'],
+    semi-axes n_std standard deviations along pc1/pc2 (M4)."""
+    angle = np.degrees(np.arctan2(pca["pc1"][1], pca["pc1"][0]))
+    ellipse = Ellipse(
+        pca["mean"], width=2 * n_std * np.sqrt(pca["along_var"]), height=2 * n_std * np.sqrt(pca["perp_var"]),
+        angle=angle, facecolor="none", edgecolor=FIT_LINE_COLOR, linewidth=2, linestyle="--",
+    )
+    ax.add_patch(ellipse)
+
+
+def plot_subject_outliers(
+    df: pd.DataFrame,
+    sub_id: str,
+    *,
+    n_std: float = 2.0,
+    pca: dict | None = None,
+    xlim: tuple[float, float] = XLIM,
+    ylim: tuple[float, float] = YLIM,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """One subject's clicks, colored by whether they fall outside a fitted
+    ellipse at n_std standard deviations along each principal axis (M4).
+
+    pca=None (default): fit the ellipse to this subject's own points --
+    the per-participant outlier check. pca=<a group_outliers result's
+    "pca">: classify this subject's points against a shared group/subgroup
+    ellipse instead -- the group-level check, where the same ellipse is
+    drawn in every subject's panel and only which of their own points fall
+    outside it changes."""
+    if pca is None:
+        result = subject_outliers(df, sub_id, n_std=n_std)
+        pca, points, mask = result["pca"], result["points"], result["outlier_mask"]
+    else:
+        points = df.loc[df["sub_id"] == sub_id, ["red", "green"]].to_numpy()
+        mask = outlier_mask(pca, points, n_std=n_std)
+
+    if ax is None:
+        _, ax = plt.subplots()
+    ax.scatter(points[~mask, 0], points[~mask, 1], color=POINT_COLOR, alpha=0.7, edgecolor="white", label="inlier")
+    ax.scatter(points[mask, 0], points[mask, 1], color=OUTLIER_COLOR, alpha=0.9, edgecolor="white", label="outlier")
+    _draw_ellipse(ax, pca, n_std=n_std)
+    _style_axes(ax, xlim=xlim, ylim=ylim, title=f"{sub_id} ({int(mask.sum())}/{len(points)} outliers)")
+    ax.legend(fontsize=6, loc="upper right")
+    return ax
+
+
+def plot_subjects_outliers_grid(
+    df: pd.DataFrame,
+    *,
+    sub_ids: list[str] | None = None,
+    group: str | None = None,
+    subgroup: str | None = None,
+    n_std: float = 2.0,
+    shared_pca: dict | None = None,
+    xlim: tuple[float, float] = XLIM,
+    ylim: tuple[float, float] = YLIM,
+) -> plt.Figure:
+    """One panel per subject (plot_subject_outliers), wrapped to at most
+    MAX_PANEL_COLS per row -- "all participants as a grid" (M4).
+
+    shared_pca=None (default): each panel fits and draws that subject's own
+    ellipse (the per-participant check). shared_pca=<a group_outliers
+    result's "pca">: every panel draws the same shared group/subgroup
+    ellipse instead, classifying each subject's own points against it (the
+    group-level check) -- pass group_outliers(df, group=..., n_std=n_std)
+    ["pca"] to match."""
+    if sub_ids is None:
+        sub_ids = subjects_in_group(df, group=group, subgroup=subgroup)
+    fig, axes = _multi_panel_figure(len(sub_ids))
+    for ax, sub_id in zip(axes, sub_ids):
+        plot_subject_outliers(df, sub_id, n_std=n_std, pca=shared_pca, xlim=xlim, ylim=ylim, ax=ax)
+    subtitle = ", ".join(filter(None, [group, subgroup])) or f"{len(sub_ids)} subjects"
+    ellipse_note = "shared group ellipse" if shared_pca is not None else "per-subject ellipse"
+    fig.suptitle(f"{subtitle} (n_std={n_std}, {ellipse_note})")
     fig.tight_layout()
     return fig
 
