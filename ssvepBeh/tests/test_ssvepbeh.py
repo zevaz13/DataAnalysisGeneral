@@ -385,3 +385,23 @@ def test_plot_overlap_returns_two_panels(beh_df, runmap_df, baselines_df):
     fig = plotting.plot_overlap(beh_df, E, ["MET001"])
     titles = [ax.get_title() for ax in fig.axes if ax.get_title()]
     assert titles == ["EEG response", "Behavioral clicks (n=30)"]
+
+
+def test_plot_grid_with_clicks_draws_one_scatter_series_and_caps_the_view(beh_df, runmap_df, baselines_df):
+    E = analysis.mean_grid(runmap_df, baselines_df, "MET001", 1, normalize=analysis.DEFAULT_NORMALIZE)
+    clicks = beh_df[beh_df["sub_id"] == "MET001"]
+    ax = plotting.plot_grid_with_clicks(E, clicks)
+    assert len(ax.collections) == 1  # the click scatter (imshow isn't a "collection")
+    assert ax.collections[0].get_offsets().shape == (len(clicks), 2)
+    assert ax.get_xlim() == (0.0, 3200.0)
+    assert ax.get_ylim() == (0.0, 2000.0)
+
+
+def test_plot_grid_with_clicks_accepts_a_filtered_subset(beh_df, runmap_df, baselines_df):
+    """Passing fewer rows (e.g. an outlier-filtered subset) must plot fewer
+    points, not the full subject's clicks."""
+    E = analysis.mean_grid(runmap_df, baselines_df, "MET001", 1, normalize=analysis.DEFAULT_NORMALIZE)
+    clicks = beh_df[beh_df["sub_id"] == "MET001"]
+    filtered = clicks.iloc[:5]
+    ax = plotting.plot_grid_with_clicks(E, filtered)
+    assert ax.collections[0].get_offsets().shape == (5, 2)

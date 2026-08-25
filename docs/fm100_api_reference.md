@@ -84,6 +84,67 @@ all-pairs one.
 - **`window=`** (both functions): circular moving-average size (1 = no
   smoothing) -- wraps around the hue circle rather than truncating at caps
   1/85, since they're real neighbors.
+- **`label_mode=`** (both functions, M2): `'angle'` (default, matplotlib's
+  own angle-in-degrees radial ticks) or `'cap'` -- relabels the radial
+  plot's ticks with the FM100 test's own printed-diagram convention
+  (`_apply_cap_labels`, `RADIAL_TICK_STEP=5`): the label sequence starts at
+  cap 85 (not cap 1) at angle 0, then continues 1, 2, ... 84
+  (`_cap_label(position_index) = ((position_index - 1) % 85) + 1`). One
+  label every 5th cap (17 labels total). No-op for `kind='linear'`.
+- **`group_profiles(df, *, group=None, subgroup=None, sub_ids=None, window=1) -> ndarray`**
+  (renamed from `_group_profiles`, now public) One smoothed error profile
+  per subject matching the filter (`(n_subjects, 85)`), each subject's own
+  sessions averaged together first. `plot_group_fm100`'s own internal
+  building block, exposed so `comparisons.py`'s `estimate_offset` can
+  bootstrap over the same per-subject profiles without recomputing them.
+
+## `comparisons.py` -- group comparisons and offset quantification (M2)
+
+Deliberately self-contained -- doesn't import `ssvep_beh_fm100/`, even
+though that project already has similar per-subject score-pooling logic,
+to keep this base modality's dependencies one-directional (see the module
+docstring).
+
+`FEATURES = ["TES", "PES_RG", "PES_BY", "VKS_MajRad", "VKS_MinRad", "VKS_Angle"]`,
+`ANGLE_FEATURE = "VKS_Angle"` (periodic, folds to `[0, 180)` -- pooled
+circularly, but compared with the same folded-Mann-Whitney approximation
+`beh/scripts/features.py`'s `compare_shape_feature` already uses for
+`orientation_deg`).
+
+- **`subject_pooled_scores(df) -> DataFrame`**
+  One row per subject: each of `FEATURES` averaged (linear mean) across
+  that subject's sessions, except `VKS_Angle` (circular mean, folded back
+  into `[0, 180)`). Adds `n_sessions`. `df` is the raw `loader.load_fm100_raw`-shaped
+  table (has a `caps` column) -- internally calls `scores.build_scores`.
+- **`group_pooled_scores(df, *, group=None, subgroup=None) -> DataFrame`**
+  `subject_pooled_scores` filtered to one group/subgroup.
+- **`compare_fm100_feature(df, feature, *, group1=None, subgroup1=None, group2=None, subgroup2=None) -> dict`**
+  Mann-Whitney U + effect size (`pingouin.mwu`) on one `FEATURES` entry
+  between two groups/subgroups, on `group_pooled_scores` (one independent
+  observation per subject). Returns `{feature, u_val, p_value, rbc, cles,
+  n1, n2}` -- same shape as `beh/scripts/features.py`'s
+  `compare_shape_feature`, run once per feature for the same reason (shows
+  which feature drives a difference; doesn't assume Gaussian samples).
+- **`estimate_offset(profiles1, profiles2, *, n_boot=2000, seed=0) -> dict`**
+  Quantifies "group 2's profile looks like group 1's + a constant".
+  `profiles1`/`profiles2` are `(n_subjects, 85)` per-subject profile arrays
+  (e.g. `plotting.group_profiles`'s output), not the two group means
+  directly. Point estimate `offset = mean(mean(profiles2) - mean(profiles1))`
+  across cap positions. **Resamples subjects for the CI/p-value, not cap
+  positions** -- the 85 positions are correlated points along one smoothed
+  curve per subject, not independent observations, so a per-position test
+  would pseudoreplicate; bootstraps subjects with replacement instead
+  (`n_boot` times), same "resample the actual unit of replication"
+  approach as `ssveps/scripts/analysis.py`'s `bootstrap_ci`. Returns
+  `{offset, ci_lower, ci_upper, p_value, r_squared}`: `p_value` uses the
+  `(1 + count) / (1 + n_boot)` correction used by every permutation/
+  bootstrap test elsewhere in this project; `r_squared` is the standard
+  regression R² for the model `mean(profiles2) ~= mean(profiles1) + offset`
+  (SS_total is `mean(profiles2)`'s own across-position variance) -- **not**
+  `1 - var(diff - mean(diff))/var(diff)`, which is mathematically always 0
+  (caught by this module's own test suite before shipping; see the
+  function's docstring). The additive analog of
+  `ssveps/scripts/analysis.py`'s `fit_gain_shape` (M8), gain fixed at 1.
 
 ## Notebooks
 
@@ -97,3 +158,17 @@ Each opens with `sys.path.append('../scripts')`, so run them with
   radial plots for one participant with the `window=` filter; group plots
   with ±1 SD shading for HC/PD/CVD/protan/deutan; a hand-picked `sub_ids`
   example grouping MET047 and MET021 together against protan/deutan.
+- **`02_group_comparisons.ipynb`** -- M2: `comparisons.compare_fm100_feature`
+  across all 6 `FEATURES` for CTR vs PD, HC vs protan, HC vs deutan, protan
+  vs deutan. *Edit:* `pairs`/`pair_labels` (top cell) for a different set
+  of comparisons.
+- **`03_flagged_subjects.ipynb`** -- M2: `plot_subject_fm100` (linear, then
+  radial at both `label_mode`s) for MET020, MET047, MET021 individually,
+  then a combined `plot_group_fm100` with `sub_ids=` for all three.
+  *Edit:* `flagged` (top cell) for a different set of subjects.
+- **`04_hc_vs_pd.ipynb`** -- M2: HC vs PD profiles side by side (both
+  `kind`s), the `compare_fm100_feature` battery filtered to this pair, and
+  `comparisons.estimate_offset(plotting.group_profiles(df, group='CTR'),
+  plotting.group_profiles(df, group='PD'))` with a plot overlaying HC's
+  mean, PD's mean, and "HC + offset" to show the fit visually. *Edit:*
+  `categories` (top cell) for a different pair.

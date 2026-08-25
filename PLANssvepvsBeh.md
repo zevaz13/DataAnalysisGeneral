@@ -45,10 +45,36 @@ and EEG response is solid and citable as-is. Individual-differences
 correlation is a documented, honestly-reported negative result with a
 concrete path forward, not silently dropped or overstated.
 
+## M2. Clicks-on-grid plots, permutation seed stability, step-by-step explainer
+
+- [x] **`03_clicks_on_grid.ipynb`** -- new `plotting.plot_grid_with_clicks`:
+  the EEG grid as a heatmap with actual click points scattered on top, one
+  combined view. Individual participants (mean grid + their own clicks),
+  repeated with behavioral outliers removed (`beh/`'s M4
+  `subject_outliers`/`group_outliers`, cross-project reuse), then groups/
+  subgroups (mean group grid vs. every member's pooled clicks), same
+  with/without-outliers pair. x/y limits capped to `[0, 3200]`/`[0, 2000]`
+  throughout. **7 subjects run past green=2000**: MET030, MET032, MET033,
+  MET034, MET040, MET041, MET043 (1-7 such clicks each, up to green=2380).
+- [x] **`04_permutation_stability.ipynb`** -- `overlap.group_overlap` at
+  200 seeds each for HC, PD, protan, deutan. **Every group stays
+  significant at every single seed** (`fraction_p<0.05` = 1.0 for all
+  four) -- extends `docs/ssvepbeh_reliability_gaps.md`'s cross-session
+  stability finding with a second, independent kind: robust to the
+  permutation RNG too, for every group without exception. One checked-and-
+  confirmed-not-a-bug curiosity: HC and deutan's p-values matched exactly
+  at every seed tested (different subjects/grids/statistics, but the same
+  null-crossing count throughout) -- PD vs. protan doesn't show this, so
+  it's specific to this pair's actual data, not a systematic issue; noted
+  in the notebook, not treated as a finding to build on.
+- [x] **`05_toroidal_shift_explained.ipynb`** -- step-by-step from-scratch
+  walkthrough (synthetic 5x5 grid, then MET001), matching `ssveps/`'s own
+  "Understanding..." notebook style.
+
 ## Next milestones
 
 FM100-vs-behavioral and FM100-vs-EEG (the researcher's stated higher
-priority per `docs/ExperimentalContext`) -- to be scoped together. Worth
-carrying `docs/ssvepbeh_reliability_gaps.md`'s lesson forward: check
-paired/per-subtype sample sizes before designing that analysis's
-statistical approach, not after.
+priority per `docs/ExperimentalContext`) turned out to already be
+implemented, in `ssvep_beh_fm100/` (`PLANssvep_bh_fm100.md` M1-M3) -- see
+`docs/findings.md` section 5. This plan's own next milestone is open, to be
+defined together.

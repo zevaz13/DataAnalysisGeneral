@@ -46,13 +46,15 @@ def _subject_profile(df: pd.DataFrame, sub_id: str, session: int, *, window: int
     return _smooth_circular(err_vals(row["caps"].iloc[0]), window)
 
 
-def _group_profiles(df: pd.DataFrame, *, group: str | None, subgroup: str | None, sub_ids: list[str] | None, window: int) -> np.ndarray:
+def group_profiles(df: pd.DataFrame, *, group: str | None = None, subgroup: str | None = None, sub_ids: list[str] | None = None, window: int = 1) -> np.ndarray:
     """One smoothed error profile per *subject* matching the filter (that
     subject's own sessions averaged together first), stacked into an
     (n_subjects, 85) array -- 19/48 subjects here have 2-3 FM100 sessions,
     so pooling by row instead would let them outweigh single-session
     subjects and pseudoreplicate the group SD, the same concern beh's
-    unit='subject' default addresses."""
+    unit='subject' default addresses. Public (not just plot_group_fm100's
+    internal helper) so comparisons.py's estimate_offset (M2) can bootstrap
+    over the same per-subject profiles without recomputing them."""
     if sub_ids is None:
         sub_ids = subjects_in_group(df, group=group, subgroup=subgroup)
     sub = df[df["sub_id"].isin(sub_ids)]
@@ -78,15 +80,47 @@ def _style_linear_axes(ax: plt.Axes, *, title: str | None = None) -> None:
         ax.set_title(title)
 
 
+RADIAL_TICK_STEP = 5  # every 5th cap gets a printed label on the radial diagram, in 'cap' label_mode
+
+
+def _cap_label(position_index: int) -> int:
+    """The FM100 test's own printed-diagram convention: the label sequence
+    starts at 85 (not 1) at angle 0, then continues 1, 2, ... 84 -- the
+    ordinary 1..85 label at each angular position, rotated back by one
+    step (position_index 0 -> 85, 1 -> 1, 2 -> 2, ..., 84 -> 84)."""
+    return ((position_index - 1) % N_CAPS) + 1
+
+
+def _apply_cap_labels(ax: plt.Axes, *, step: int = RADIAL_TICK_STEP) -> None:
+    """Replaces a radial plot's default angle-in-degrees tick labels with
+    the FM100 test's own cap-number convention (_cap_label), one printed
+    label every `step` cap positions (17 labels at the default step=5,
+    legible without crowding the circle)."""
+    indices = np.arange(0, N_CAPS, step)
+    ax.set_xticks(CAP_ANGLES[indices])
+    ax.set_xticklabels([str(_cap_label(i)) for i in indices])
+
+
 def plot_subject_fm100(
-    df: pd.DataFrame, sub_id: str, *, kind: str = "linear", sessions: list[int] | None = None, window: int = 1, ax: plt.Axes | None = None
+    df: pd.DataFrame,
+    sub_id: str,
+    *,
+    kind: str = "linear",
+    sessions: list[int] | None = None,
+    window: int = 1,
+    label_mode: str = "angle",
+    ax: plt.Axes | None = None,
 ) -> plt.Axes:
     """One participant's error profile, one line per session overlaid
     (at most 3 sessions in this dataset, colored like beh's
     plot_subject_sessions). kind='linear' or 'radial'. window is the
-    circular moving-average size (1 = no smoothing)."""
+    circular moving-average size (1 = no smoothing). label_mode (radial
+    only): 'angle' (default, matplotlib's own angle-in-degrees ticks) or
+    'cap' (the FM100 test's own cap-number convention, _apply_cap_labels)."""
     if kind not in ("linear", "radial"):
         raise ValueError(f"kind must be 'linear' or 'radial', got {kind!r}")
+    if label_mode not in ("angle", "cap"):
+        raise ValueError(f"label_mode must be 'angle' or 'cap', got {label_mode!r}")
     if sessions is None:
         sessions = sorted(df.loc[df["sub_id"] == sub_id, "session"].unique())
     if ax is None:
@@ -102,6 +136,8 @@ def plot_subject_fm100(
         _style_linear_axes(ax, title=sub_id)
     else:
         ax.set_title(sub_id)
+        if label_mode == "cap":
+            _apply_cap_labels(ax)
     ax.legend(fontsize=8)
     return ax
 
@@ -112,18 +148,22 @@ def plot_group_fm100(
     *,
     kind: str = "linear",
     window: int = 1,
+    label_mode: str = "angle",
     ax: plt.Axes | None = None,
 ) -> plt.Axes:
     """One line + shaded +-1 SD band per category -- categories is the same
     {"label", "group", "subgroup"} (or "sub_ids") shape used throughout this
     project. Each subject contributes one profile (their own sessions
-    averaged first, see _group_profiles) to that category's mean/SD, so the
+    averaged first, see group_profiles) to that category's mean/SD, so the
     ±1 SD band reflects subject-to-subject spread, not session count.
-    kind='linear' or 'radial'. Up to len(FULL_PALETTE) (8) categories -- a
-    line chart, so the dataviz skill's adjacent-pair color rule applies, not
-    the stricter all-pairs scatter cap."""
+    kind='linear' or 'radial'. label_mode (radial only): 'angle' (default)
+    or 'cap' (see plot_subject_fm100). Up to len(FULL_PALETTE) (8)
+    categories -- a line chart, so the dataviz skill's adjacent-pair color
+    rule applies, not the stricter all-pairs scatter cap."""
     if kind not in ("linear", "radial"):
         raise ValueError(f"kind must be 'linear' or 'radial', got {kind!r}")
+    if label_mode not in ("angle", "cap"):
+        raise ValueError(f"label_mode must be 'angle' or 'cap', got {label_mode!r}")
     if len(categories) > len(FULL_PALETTE):
         raise ValueError(f"plot_group_fm100 supports at most {len(FULL_PALETTE)} categories, got {len(categories)}")
     if ax is None:
@@ -131,7 +171,7 @@ def plot_group_fm100(
 
     x = CAP_ANGLES if kind == "radial" else CAP_POSITIONS
     for cat, color in zip(categories, FULL_PALETTE):
-        profiles = _group_profiles(df, group=cat.get("group"), subgroup=cat.get("subgroup"), sub_ids=cat.get("sub_ids"), window=window)
+        profiles = group_profiles(df, group=cat.get("group"), subgroup=cat.get("subgroup"), sub_ids=cat.get("sub_ids"), window=window)
         mean, sd = profiles.mean(axis=0), profiles.std(axis=0, ddof=1)
         plot_x, plot_mean = _radial_xy(x, mean, kind=kind)
         _, plot_lower = _radial_xy(x, mean - sd, kind=kind)
@@ -143,5 +183,7 @@ def plot_group_fm100(
         _style_linear_axes(ax, title="Group FM100 error profile (mean ± 1 SD)")
     else:
         ax.set_title("Group FM100 error profile (mean ± 1 SD)")
+        if label_mode == "cap":
+            _apply_cap_labels(ax)
     ax.legend(fontsize=8)
     return ax

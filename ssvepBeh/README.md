@@ -65,6 +65,12 @@ see `beh/README.md`'s Tests section.)
   EEG session 1 vs. session 2 for the same paired subjects.
 - `scripts/plotting.py` -- `plot_overlap`, EEG heatmap + behavioral density
   map side by side, for one participant or a pooled group/list.
+  `plot_grid_with_clicks` (M2): one combined view instead -- the EEG grid
+  as a heatmap with the actual (red, green) click points scattered on top,
+  `xlim`/`ylim` capped to `[0, 3200]`/`[0, 2000]` by default. Takes any
+  clicks-shaped DataFrame, so an outlier-filtered subset
+  (`beh/scripts/features.py`'s `subject_outliers`/`group_outliers`, M4)
+  plots the same way as the full click set.
 
 ## A permutation p-value can't legitimately be exactly 0
 
@@ -115,3 +121,17 @@ paired-subject counts behind the reliability gap.
   assessed for reliability at all given today's paired-subject counts.
   Ends with the honest verdict and next steps (also in
   `docs/ssvepbeh_reliability_gaps.md`).
+- `03_clicks_on_grid.ipynb` -- M2: `plot_grid_with_clicks`, individual and
+  group-level, with and without behavioral outliers removed (`beh/`'s M4
+  ellipse machinery). Lists the 7 subjects whose clicks run past
+  green=2000. Same "clicks sit where EEG is low" picture as `01_explore
+  .ipynb` established statistically, now visually direct, individual
+  outliers included.
+- `04_permutation_stability.ipynb` -- M2: `overlap.group_overlap` at 200
+  seeds per group, HC/PD/protan/deutan. **Every group stays significant at
+  every seed** (`fraction_p<0.05` = 1.0 throughout) -- spatial overlap is
+  robust to the permutation RNG, not just to which EEG session is used.
+- `05_toroidal_shift_explained.ipynb` -- M2: a from-scratch, step-by-step
+  walkthrough of `weighted_overlap_test` (small synthetic grid, then one
+  real participant), matching `ssveps/`'s own "Understanding..." notebook
+  style.

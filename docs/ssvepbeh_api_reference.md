@@ -144,6 +144,20 @@ side fixed (each subject's pooled clicks) and compares the EEG side across
   green on y in both panels (transposed internally for `imshow`, since
   grids here are `[red_idx, green_idx]` but `imshow` wants
   `[row, col] = [y, x]`).
+- **`plot_grid_with_clicks(eeg_grid, clicks_df, *, red=DEFAULT_RED, green=DEFAULT_GREEN, xlim=(0, 3200), ylim=(0, 2000), title=None, ax=None) -> Axes`** (M2)
+  One combined panel instead of `plot_overlap`'s side-by-side density
+  comparison: `eeg_grid` as a heatmap, with `clicks_df`'s actual `red`/
+  `green` points scattered on top (white fill, black edge -- readable
+  against every value of `EEG_CMAP`). `clicks_df` is any DataFrame with
+  `red`/`green` columns -- a subject's own rows, a group's pooled rows, or
+  an outlier-filtered subset of either (`beh/scripts/features.py`'s
+  `subject_outliers`/`group_outliers`, M4) for the "outliers removed"
+  version, filtered by the caller before this function ever sees it.
+  `xlim`/`ylim` default to the EEG grid's own sampled range, not the
+  data's own extent -- clicks past `green=2000` (a handful of subjects,
+  `03_clicks_on_grid.ipynb` lists them) are shown clipped at the axis
+  edge rather than expanding the view, for visual comparability across
+  every plot.
 
 ## Notebooks
 
@@ -165,3 +179,22 @@ side fixed (each subject's pooled clicks) and compares the EEG side across
   can't be assessed at all (2/0/2 paired subjects). Full write-up and next
   steps: `docs/ssvepbeh_reliability_gaps.md`. *Edit:* the category lists in
   the cross-session-reliability cells to check a different subset.
+- **`03_clicks_on_grid.ipynb`** -- M2: `plotting.plot_grid_with_clicks` for
+  individual participants and groups/subgroups, with and without behavioral
+  outliers (`beh/scripts/features.py`'s `subject_outliers`/`group_outliers`,
+  cross-project import). Lists every subject whose clicks exceed
+  green=2000 (7 subjects, `MET030/032/033/034/040/041/043`). *Edit:*
+  `example_subjects`, `group_categories` (top cell).
+- **`04_permutation_stability.ipynb`** -- M2: `overlap.group_overlap` at
+  200 seeds per group (HC/PD/protan/deutan), collecting `p_value` directly
+  (unlike `ssveps/`'s cluster-based tests, `weighted_overlap_test` already
+  returns one scalar p-value per call, so no cluster-survival bookkeeping
+  is needed). **Every group's `fraction_p<0.05` is 1.0** -- stable
+  regardless of seed, for all four groups. *Edit:* `N_SEEDS`, `categories`
+  (top cell).
+- **`05_toroidal_shift_explained.ipynb`** -- M2: builds a 5x5 synthetic
+  toy grid, computes `obs_stat` by hand, demonstrates one manual
+  `np.roll` shift, builds a null distribution and p-value from scratch,
+  confirms it matches `overlap.weighted_overlap_test`'s own computation,
+  then repeats the same four steps on one real participant (MET001).
+  *Edit:* the toy grid construction (top cells) or `sub_id` (bottom cell).

@@ -19,9 +19,10 @@ sys.path.insert(0, str(SCRIPTS))
 # those test modules first, sys.modules would hold their versions. Drop them
 # so the imports below re-resolve against SCRIPTS (see beh/README.md's Tests
 # section for the same issue there).
-for _name in ("loader", "plotting", "scores"):
+for _name in ("loader", "plotting", "scores", "comparisons"):
     sys.modules.pop(_name, None)
 
+import comparisons  # noqa: E402
 import loader  # noqa: E402
 import plotting  # noqa: E402
 import scores  # noqa: E402
@@ -220,7 +221,7 @@ def test_plot_group_fm100_averages_multi_session_subjects_before_group_stats(df)
     2-session subject)."""
     session_counts = df.groupby("sub_id")["session"].nunique()
     pair = [session_counts[session_counts == 1].index[0], session_counts[session_counts == 2].index[0]]
-    profiles = plotting._group_profiles(df, group=None, subgroup=None, sub_ids=pair, window=1)
+    profiles = plotting.group_profiles(df, sub_ids=pair)
     assert profiles.shape == (2, 85)
 
 
@@ -233,3 +234,89 @@ def test_smooth_circular_preserves_length():
     values = np.arange(85, dtype=float)
     for window in [2, 3, 5, 8]:
         assert plotting._smooth_circular(values, window).shape == (85,)
+
+
+# --- radial cap-number labels (M2) -------------------------------------------
+
+
+def test_cap_label_starts_at_85_then_continues_1_through_84():
+    expected = [85] + list(range(1, 85))
+    assert [plotting._cap_label(i) for i in range(85)] == expected
+
+
+def test_apply_cap_labels_uses_the_requested_step(df):
+    ax = plotting.plot_subject_fm100(df, "MET001", kind="radial", sessions=[1], label_mode="cap")
+    labels = [t.get_text() for t in ax.get_xticklabels()]
+    assert labels == [str(plotting._cap_label(i)) for i in range(0, 85, plotting.RADIAL_TICK_STEP)]
+    assert labels[0] == "85"
+
+
+def test_plot_subject_fm100_rejects_unknown_label_mode(df):
+    with pytest.raises(ValueError):
+        plotting.plot_subject_fm100(df, "MET001", label_mode="nonsense")
+
+
+def test_plot_group_fm100_cap_labels_only_applied_for_radial(df):
+    """label_mode='cap' on a linear plot should be silently ignored, not
+    error -- only the radial axes has angle ticks to relabel."""
+    categories = [{"label": "HC", "group": "CTR"}]
+    ax = plotting.plot_group_fm100(df, categories, kind="linear", label_mode="cap")
+    assert ax.get_xlim() == (1.0, 85.0)
+
+
+# --- comparisons.py: group comparisons and offset (M2) -----------------------
+
+
+def test_subject_pooled_scores_one_row_per_subject(df):
+    pooled = comparisons.subject_pooled_scores(df)
+    assert len(pooled) == df["sub_id"].nunique()
+    assert set(comparisons.FEATURES).issubset(pooled.columns)
+    assert pooled["VKS_Angle"].between(0, 180, inclusive="left").all()
+
+
+def test_subject_pooled_scores_linear_mean_matches_manual_average(df):
+    """Non-angle features: plain mean across a subject's sessions."""
+    multi_session = df.groupby("sub_id")["session"].nunique()
+    sub_id = multi_session[multi_session > 1].index[0]
+    pooled = comparisons.subject_pooled_scores(df)
+    row = pooled[pooled["sub_id"] == sub_id].iloc[0]
+    expected_tes = scores.build_scores(df[df["sub_id"] == sub_id])["TES"].mean()
+    assert row["TES"] == pytest.approx(expected_tes)
+
+
+def test_group_pooled_scores_filters_to_the_requested_group(df):
+    result = comparisons.group_pooled_scores(df, group="PD")
+    assert set(result["sub_id"]) == set(loader.subjects_in_group(df, group="PD"))
+
+
+def test_compare_fm100_feature_detects_a_known_separation(df):
+    """CTR vs CVD on TES is a large, well-established real separation
+    (docs/findings.md section 1: CVD's TES is roughly 4x CTR's) --
+    compare_fm100_feature (built on subject_pooled_scores, which needs a
+    raw caps-shaped df, not a pre-scored one) should find it easily."""
+    result = comparisons.compare_fm100_feature(df, "TES", group1="CTR", group2="CVD")
+    assert result["p_value"] < 0.001
+    assert result["n1"] == len(loader.subjects_in_group(df, group="CTR"))
+    assert result["n2"] == len(loader.subjects_in_group(df, group="CVD"))
+
+
+def test_estimate_offset_recovers_a_planted_constant():
+    rng = np.random.default_rng(0)
+    n_subjects, n_caps = 15, 85
+    base = rng.normal(50, 5, (n_subjects, n_caps))
+    shifted = base + rng.normal(0, 1, (n_subjects, n_caps)) + 30.0  # +30 constant, plus a little noise
+    result = comparisons.estimate_offset(base, shifted, n_boot=500, seed=0)
+    assert result["offset"] == pytest.approx(30.0, abs=1.0)
+    assert result["ci_lower"] < 30.0 < result["ci_upper"]
+    assert result["p_value"] < 0.01
+    assert result["r_squared"] > 0.9  # a near-pure constant shift, little per-position structure left
+
+
+def test_estimate_offset_ci_includes_zero_when_there_is_no_offset():
+    rng = np.random.default_rng(0)
+    n_subjects, n_caps = 15, 85
+    base = rng.normal(50, 5, (n_subjects, n_caps))
+    same = rng.normal(50, 5, (n_subjects, n_caps))
+    result = comparisons.estimate_offset(base, same, n_boot=500, seed=0)
+    assert result["ci_lower"] < 0 < result["ci_upper"]
+    assert result["p_value"] > 0.05
