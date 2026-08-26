@@ -29,6 +29,9 @@ from loader import subjects_in_group
 
 POINT_COLOR = "#2a78d6"
 SESSION_COLORS = ["#2a78d6", "#eb6834", "#1baf7a"]  # validated all-pairs for scatter, up to 3 categories
+SCATTER4_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#4a3aa7"]  # validated all-pairs for scatter, up to 4 (dashboard M2) --
+# #4a3aa7 replaces FULL_PALETTE's natural 4th slot, #eda100, which fails the
+# dataviz skill's normal-vision floor against #eb6834 (deltaE 13.7 < 15)
 FIT_LINE_COLOR = "#52514e"  # secondary ink, not a categorical slot: this is a derived overlay, not a series
 OUTLIER_COLOR = SESSION_COLORS[1]  # same validated all-pairs slot as session 2 -- outlier/inlier is a 2-category scatter too
 # Full 8-hue categorical order (dataviz skill's default palette), for the centroid
@@ -291,16 +294,16 @@ def plot_feature_space(
     features.subject_shape_features) -- x_feature/y_feature name one of its
     keys ('orientation_deg', 'along_var', 'perp_var'). categories is the
     same {"label", "group", "subgroup"} shape as plot_groups_side_by_side,
-    capped at len(SESSION_COLORS): like plot_subject_sessions, this overlays
+    capped at len(SCATTER4_COLORS): like plot_subject_sessions, this overlays
     series by hue on one panel, so it inherits the dataviz skill's all-pairs
-    scatter color limit (only the first three categorical slots are
-    colorblind-safe once every pair of marks can sit side by side) -- past
-    that, call it multiple times or facet instead."""
-    if len(categories) > len(SESSION_COLORS):
-        raise ValueError(f"plot_feature_space supports at most {len(SESSION_COLORS)} categories (scatter all-pairs color limit), got {len(categories)}")
+    scatter color limit -- past that, call it multiple times or facet
+    instead. (Dashboard M2: raised from 3 to 4 categories using
+    SCATTER4_COLORS, a separately-validated all-pairs-safe 4-color set.)"""
+    if len(categories) > len(SCATTER4_COLORS):
+        raise ValueError(f"plot_feature_space supports at most {len(SCATTER4_COLORS)} categories (scatter all-pairs color limit), got {len(categories)}")
     if ax is None:
         _, ax = plt.subplots()
-    for cat, color in zip(categories, SESSION_COLORS):
+    for cat, color in zip(categories, SCATTER4_COLORS):
         feats = group_features(df, group=cat.get("group"), subgroup=cat.get("subgroup"))
         ax.scatter(feats[x_feature], feats[y_feature], color=color, alpha=0.8, edgecolor="white", label=f"{cat['label']} (n={len(feats)})")
     ax.set_xlabel(x_feature)
@@ -361,5 +364,31 @@ def plot_feature_group_centroids(
     ax.set_xlabel(x_feature)
     ax.set_ylabel(y_feature)
     ax.set_title(f"Group centroids: {x_feature} vs {y_feature}")
+    ax.legend(fontsize=8)
+    return ax
+
+
+def plot_subjects_cloud_overlay(
+    df: pd.DataFrame,
+    sub_ids: list[str],
+    *,
+    xlim: tuple[float, float] = XLIM,
+    ylim: tuple[float, float] = YLIM,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """Every click from several subjects (every session pooled per subject,
+    like plot_subject_cloud), overlaid on one panel with one color per
+    subject (dashboard M2's "multiple participants ... each with a different
+    color" raw-click view) -- unlike plot_subjects_grid's one-panel-per-
+    subject faceting. Up to len(SCATTER4_COLORS) (4) subjects, the same
+    all-pairs scatter color limit as plot_feature_space."""
+    if len(sub_ids) > len(SCATTER4_COLORS):
+        raise ValueError(f"plot_subjects_cloud_overlay supports at most {len(SCATTER4_COLORS)} subjects, got {len(sub_ids)}")
+    if ax is None:
+        _, ax = plt.subplots()
+    for sub_id, color in zip(sub_ids, SCATTER4_COLORS):
+        sub = df[df["sub_id"] == sub_id]
+        ax.scatter(sub["red"], sub["green"], color=color, alpha=0.7, edgecolor="white", label=f"{sub_id} (n={len(sub)})")
+    _style_axes(ax, xlim=xlim, ylim=ylim, title="Participants (all sessions pooled)")
     ax.legend(fontsize=8)
     return ax

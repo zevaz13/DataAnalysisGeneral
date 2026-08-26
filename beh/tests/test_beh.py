@@ -225,12 +225,13 @@ def test_plot_subject_cloud_show_fit_adds_a_line(df):
     assert len(ax.lines) == 1
 
 
-def test_plot_feature_space_rejects_more_categories_than_session_colors(df):
+def test_plot_feature_space_rejects_more_categories_than_scatter4_colors(df):
     categories = [
         {"label": "HC", "group": "CTR"},
         {"label": "PD", "group": "PD"},
         {"label": "CVD", "group": "CVD"},
         {"label": "protan", "subgroup": "protan"},
+        {"label": "deutan", "subgroup": "deutan"},
     ]
     with pytest.raises(ValueError):
         plotting.plot_feature_space(df, categories)
@@ -240,6 +241,18 @@ def test_plot_feature_space_one_series_per_category(df):
     categories = [{"label": "HC", "group": "CTR"}, {"label": "PD", "group": "PD"}]
     ax = plotting.plot_feature_space(df, categories)
     assert len(ax.collections) == len(categories)
+
+
+def test_plot_subjects_cloud_overlay_one_series_per_subject(df):
+    sub_ids = sorted(df["sub_id"].unique())[:3]
+    ax = plotting.plot_subjects_cloud_overlay(df, sub_ids)
+    assert len(ax.collections) == len(sub_ids)
+
+
+def test_plot_subjects_cloud_overlay_rejects_more_subjects_than_scatter4_colors(df):
+    sub_ids = sorted(df["sub_id"].unique())[: len(plotting.SCATTER4_COLORS) + 1]
+    with pytest.raises(ValueError):
+        plotting.plot_subjects_cloud_overlay(df, sub_ids)
 
 
 # --- centroid plots (M3) --------------------------------------------------

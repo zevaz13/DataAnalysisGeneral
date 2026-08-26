@@ -35,6 +35,11 @@ MAX_PANEL_COLS = 5
 
 SEQUENTIAL_BLUE = LinearSegmentedColormap.from_list("sequential_blue", ["#cde2fb", "#6da7ec", "#256abf", "#0d366b"])
 DIVERGING_BLUE_RED = LinearSegmentedColormap.from_list("diverging_blue_red", ["#2a78d6", "#f0efec", "#e34948"])
+# db-specific ramp (dashboard M2, "different colors for different normalizations") --
+# same neutral midpoint and red pole as DIVERGING_BLUE_RED (positive change stays red
+# across every diverging ramp), green pole reuses this project's own validated green
+# (SESSION_COLORS' third slot, see beh/scripts/plotting.py) rather than a new hex value.
+DIVERGING_GREEN_RED = LinearSegmentedColormap.from_list("diverging_green_red", ["#1baf7a", "#f0efec", "#e34948"])
 DISTRIBUTION_COLOR = "#256abf"
 
 METHOD_LABELS = {"percent": "% change from baseline", "db": "dB change from baseline", "zscore": "baseline z-score"}

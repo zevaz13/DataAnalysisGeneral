@@ -22,6 +22,9 @@ from loader import subjects_in_group
 from scores import N_CAPS, err_vals
 
 SESSION_COLORS = ["#2a78d6", "#eb6834", "#1baf7a"]  # validated all-pairs for scatter, up to 3 categories
+SUBJECT_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#4a3aa7"]  # validated all-pairs for scatter, up to 4 subjects --
+# #4a3aa7 replaces FULL_PALETTE's natural 4th slot, #eda100, which fails the
+# dataviz skill's normal-vision floor against #eb6834 (deltaE 13.7 < 15)
 FULL_PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]  # adjacent-pair validated, for lines
 BAND_ALPHA = 0.2
 
@@ -185,5 +188,75 @@ def plot_group_fm100(
         ax.set_title("Group FM100 error profile (mean ± 1 SD)")
         if label_mode == "cap":
             _apply_cap_labels(ax)
+    ax.legend(fontsize=8)
+    return ax
+
+
+def plot_subjects_fm100(
+    df: pd.DataFrame,
+    sub_ids: list[str],
+    *,
+    kind: str = "linear",
+    window: int = 1,
+    label_mode: str = "angle",
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """Multiple participants overlaid, one color each (dashboard M2). Unlike
+    plot_subject_fm100 (one subject, one line per session), this always
+    plots session 1 only per subject -- with several subjects already
+    competing for color, adding a second line style per subject for session
+    would overload the legend. Up to len(SUBJECT_COLORS) (4) subjects."""
+    if len(sub_ids) > len(SUBJECT_COLORS):
+        raise ValueError(f"plot_subjects_fm100 supports at most {len(SUBJECT_COLORS)} subjects, got {len(sub_ids)}")
+    if kind not in ("linear", "radial"):
+        raise ValueError(f"kind must be 'linear' or 'radial', got {kind!r}")
+    if label_mode not in ("angle", "cap"):
+        raise ValueError(f"label_mode must be 'angle' or 'cap', got {label_mode!r}")
+    if ax is None:
+        _, ax = plt.subplots(subplot_kw={"projection": "polar"} if kind == "radial" else None)
+
+    x = CAP_ANGLES if kind == "radial" else CAP_POSITIONS
+    for sub_id, color in zip(sub_ids, SUBJECT_COLORS):
+        profile = _subject_profile(df, sub_id, 1, window=window)
+        plot_x, plot_y = _radial_xy(x, profile, kind=kind)
+        ax.plot(plot_x, plot_y, color=color, linewidth=2, label=sub_id)
+
+    if kind == "linear":
+        _style_linear_axes(ax, title="Participants (session 1)")
+    else:
+        ax.set_title("Participants (session 1)")
+        if label_mode == "cap":
+            _apply_cap_labels(ax)
+    ax.legend(fontsize=8)
+    return ax
+
+
+def plot_group_vs_subjects_fm100(
+    df: pd.DataFrame,
+    categories: list[dict],
+    sub_ids: list[str],
+    *,
+    kind: str = "linear",
+    window: int = 1,
+    label_mode: str = "angle",
+) -> plt.Axes:
+    """plot_group_fm100's category bands (solid line + shaded SD, same
+    FULL_PALETTE colors) with individual participants' session-1 profiles
+    (dashed, SUBJECT_COLORS) overlaid on the same axes (dashboard M2, "compare
+    a group to one or more participants"). Dashed vs. solid is the
+    distinguishing encoding, not color alone, since a subject's color can
+    coincide with an unrelated category's -- consistent with the dataviz
+    skill's "identity is never color-alone" rule. Up to len(SUBJECT_COLORS)
+    (4) subjects; categories follows plot_group_fm100's own cap."""
+    if len(sub_ids) > len(SUBJECT_COLORS):
+        raise ValueError(f"plot_group_vs_subjects_fm100 supports at most {len(SUBJECT_COLORS)} subjects, got {len(sub_ids)}")
+    ax = plot_group_fm100(df, categories, kind=kind, window=window, label_mode=label_mode)
+
+    x = CAP_ANGLES if kind == "radial" else CAP_POSITIONS
+    for sub_id, color in zip(sub_ids, SUBJECT_COLORS):
+        profile = _subject_profile(df, sub_id, 1, window=window)
+        plot_x, plot_y = _radial_xy(x, profile, kind=kind)
+        ax.plot(plot_x, plot_y, color=color, linewidth=2, linestyle="--", label=f"{sub_id} (individual)")
+
     ax.legend(fontsize=8)
     return ax

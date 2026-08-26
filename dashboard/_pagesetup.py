@@ -16,6 +16,17 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# Shared across every page's category selector -- all three projects use the
+# same group/subgroup labels (see e.g. beh/README.md's group field), so this
+# is dashboard-layer presentation config, not a per-project analysis choice.
+CATEGORY_OPTIONS = {
+    "HC": {"group": "CTR"},
+    "PD": {"group": "PD"},
+    "CVD": {"group": "CVD"},
+    "protan": {"subgroup": "protan"},
+    "deutan": {"subgroup": "deutan"},
+}
+
 
 def use_scripts(rel_path: str, *names: str) -> dict:
     """Import `names` (e.g. "loader", "plotting") from

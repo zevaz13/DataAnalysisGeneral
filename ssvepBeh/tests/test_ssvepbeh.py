@@ -405,3 +405,48 @@ def test_plot_grid_with_clicks_accepts_a_filtered_subset(beh_df, runmap_df, base
     filtered = clicks.iloc[:5]
     ax = plotting.plot_grid_with_clicks(E, filtered)
     assert ax.collections[0].get_offsets().shape == (5, 2)
+
+
+def test_plot_grid_with_clicks_respects_size_alpha_and_cmap(beh_df, runmap_df, baselines_df):
+    E = analysis.mean_grid(runmap_df, baselines_df, "MET001", 1, normalize=analysis.DEFAULT_NORMALIZE)
+    clicks = beh_df[beh_df["sub_id"] == "MET001"]
+    ax = plotting.plot_grid_with_clicks(E, clicks, s=8, alpha=0.4, cmap="plasma")
+    assert ax.collections[0].get_sizes()[0] == 8
+    assert ax.collections[0].get_alpha() == 0.4
+    assert ax.images[0].get_cmap().name == "plasma"
+
+
+def test_plot_grid_with_clicks_vmin_vmax_override_autoscale(beh_df, runmap_df, baselines_df):
+    E = analysis.mean_grid(runmap_df, baselines_df, "MET001", 1, normalize=analysis.DEFAULT_NORMALIZE)
+    clicks = beh_df[beh_df["sub_id"] == "MET001"]
+    ax = plotting.plot_grid_with_clicks(E, clicks, vmin=-5, vmax=5)
+    assert ax.images[0].get_clim() == (-5, 5)
+
+
+# --- multi-panel click overlay (dashboard M2) --------------------------------
+
+
+def test_plot_grids_with_clicks_draws_one_panel_per_grid(beh_df, runmap_df, baselines_df):
+    sub_ids = ["MET001", "MET002", "MET003"]
+    grids = [analysis.mean_grid(runmap_df, baselines_df, sub_id, 1, normalize=analysis.DEFAULT_NORMALIZE) for sub_id in sub_ids]
+    clicks_dfs = [beh_df[beh_df["sub_id"] == sub_id] for sub_id in sub_ids]
+    fig = plotting.plot_grids_with_clicks(grids, clicks_dfs, sub_ids)
+    titles = [ax.get_title() for ax in fig.axes if ax.get_title()]
+    assert titles == sub_ids
+
+
+def test_plot_grids_with_clicks_shares_one_color_scale_across_panels(beh_df, runmap_df, baselines_df):
+    sub_ids = ["MET001", "MET002"]
+    grids = [analysis.mean_grid(runmap_df, baselines_df, sub_id, 1, normalize=analysis.DEFAULT_NORMALIZE) for sub_id in sub_ids]
+    clicks_dfs = [beh_df[beh_df["sub_id"] == sub_id] for sub_id in sub_ids]
+    fig = plotting.plot_grids_with_clicks(grids, clicks_dfs, sub_ids, diverging=True)
+    heatmap_axes = [ax for ax in fig.axes if ax.get_title()]
+    clims = [ax.images[0].get_clim() for ax in heatmap_axes]
+    assert clims[0] == clims[1]
+
+
+def test_plot_grids_with_clicks_rejects_mismatched_lengths(beh_df, runmap_df, baselines_df):
+    grid = analysis.mean_grid(runmap_df, baselines_df, "MET001", 1, normalize=analysis.DEFAULT_NORMALIZE)
+    clicks = beh_df[beh_df["sub_id"] == "MET001"]
+    with pytest.raises(ValueError):
+        plotting.plot_grids_with_clicks([grid, grid], [clicks], ["a", "b"])

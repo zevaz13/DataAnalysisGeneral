@@ -96,6 +96,95 @@ discovered there. The dashboard only presents results already computed.
       numbers (e.g. behavioral `orientation_deg` protan-vs-deutan
       p=0.0003, matching `docs/findings.md`).
 
+## M2. Improvements to first pilot
+
+Two new all-pairs colorblind-safe categorical colors were needed for this
+milestone (FM100/Behavioral's per-subject overlay views, and the 3->4
+category cap): `#4a3aa7` (purple, already in `FULL_PALETTE`) validated
+clean; `#eda100` (the palette's natural next slot) failed the dataviz
+skill's normal-vision floor against `#eb6834` (deltaE 13.7 < 15) and was
+rejected. Each project defines its own `SUBJECT_COLORS`/`SCATTER4_COLORS`
+constant with the validated 4-color set, following this repo's existing
+per-project-own-constants convention (no shared palette module).
+
+### Home
+- [x] `color-wheel.jpg` displayed via `st.image`.
+- [x] Removed the "each page reuses the same..." paragraph.
+- [x] Three `st.page_link` buttons in `st.columns(3)`, each with a one-line
+      description underneath (FM100/Behavioral/SSVEP).
+- [x] Footer links to the GitHub repo, README.md, and docs/findings.md
+      (`zevaz13/DataAnalysisGeneral`, confirmed from `git remote`) --
+      local-only hosting means these can't link to local files directly, so
+      they point at the same repo's GitHub-rendered copies instead.
+### FM100
+- [x] Smoothing window slider: 1-10, step 1 (was 1-9 step 2, odd only --
+      nothing in `_smooth_circular` requires an odd window).
+- [x] `st.tabs(["Group", "Participant"])` replaces the single-screen layout.
+- [x] Radial `label_mode` ('angle'/'cap') toggle, disabled outside radial mode.
+- [x] Participant tab: multiselect up to 4 -- 1 selected reuses
+      `plot_subject_fm100` (every session); 2+ uses new `plot_subjects_fm100`
+      (session 1 only per subject, own color each).
+- [x] Group tab: optional participant multiselect overlays onto the group
+      plot via new `plot_group_vs_subjects_fm100` (group bands solid,
+      individual subjects dashed on the same axes -- dash, not just color,
+      carries the group-vs-individual distinction, since a subject's color
+      can coincide with an unrelated category's).
+### Behavioral
+- [x] `st.tabs(["Raw clicks", "Shape features"])`, raw clicks first/default.
+- [x] Raw clicks tab: subject multiselect (up to 4) with a
+      side-by-side/overlaid radio -- side-by-side reuses existing
+      `plot_subjects_grid` unchanged; overlaid uses new
+      `plot_subjects_cloud_overlay` (one panel, one color per subject).
+- [x] Category cap raised 3->4 (`plot_feature_space`'s hard cap now
+      `SCATTER4_COLORS`, the new validated 4-color set).
+- [x] Feature tab shows a plain-language description of each shape feature
+      (orientation_deg/along_var/perp_var) above the feature-space plot.
+### SSVEP
+- [x] `db` normalization gets its own diverging colormap, `DIVERGING_GREEN_RED`
+      (green pole reuses this project's own already-validated green rather
+      than a new hex value; red pole and neutral midpoint match
+      `DIVERGING_BLUE_RED` so "positive change = red" stays consistent
+      across every diverging ramp). Percent/raw keep their existing ramps.
+- [x] `st.tabs(["Groups", "Individuals"])`.
+- [x] Groups tab: category cap raised 3->4 (heatmap facets have no
+      color-safety cap, unlike the scatter views). "Show behavioral clicks"
+      toggle rebuilds the panel grid via `analysis.mean_grid_across_subjects`
+      + `ssvepBeh/scripts/plotting.py`'s `plot_grid_with_clicks(ax=...)` per
+      category instead of `plot_groups_side_by_side`, since the toggle needs
+      per-panel click overlays that function doesn't produce. Per-group
+      subject breakdown (`plot_subjects_side_by_side`) kept at the end of
+      the tab.
+- [x] Individuals tab: subject multiselect draws from every subject at
+      session 1, not one group (`plot_subjects_side_by_side`'s existing
+      `sub_ids=` param already supports this -- no new plotting code
+      needed). Same behavioral-click toggle as the Groups tab.
+- [x] `plot_grid_with_clicks` gained `s=`/`alpha=`/`cmap=` params (previously
+      hardcoded); dashboard overlay calls use `s=8, alpha=0.4` (smaller/more
+      transparent than the notebooks' `s=20, alpha=0.8` defaults) and pass
+      through the db colormap override.
+- [x] Full test suite (`beh/`, `standardizedScores/FM100/`, `ssveps/`,
+      `ssvepBeh/`) still passes (171/171, 12 new); dashboard smoke-tested
+      both via HTTP (all 4 routes, no server-log tracebacks) and by directly
+      calling every new/changed function with real data in one process.
+
+### Review-driven cleanup (not in the original ask)
+- [x] The behavioral-click-overlay grids were first built as two near-
+      identical inline `plt.subplots` loops in `dashboard/pages/3_SSVEP.py`
+      (Groups and Individuals tabs) -- flagged in review as duplicated
+      plotting logic living in the dashboard instead of `scripts/`, with no
+      shared color scale or panel-wrapping across the panels it drew (unlike
+      every sibling multi-panel function in this repo). Replaced with a
+      proper `plot_grids_with_clicks` in `ssvepBeh/scripts/plotting.py`
+      (its own `_multi_panel_figure`/`_auto_clim`, mirroring
+      `ssveps/scripts/plotting.py`'s), called once per tab.
+- [x] `CATEGORY_OPTIONS` was duplicated verbatim across all three pages --
+      moved to `dashboard/_pagesetup.py` as shared dashboard-layer config.
+- [x] Added tests for the three new plotting functions
+      (`plot_subjects_fm100`, `plot_group_vs_subjects_fm100`,
+      `plot_subjects_cloud_overlay`) and for `plot_grid_with_clicks`'s new
+      `s=`/`alpha=`/`cmap=`/`vmin=`/`vmax=` params and the new
+      `plot_grids_with_clicks`, matching this repo's existing
+      one-test-per-plot-function-plus-cap-rejection convention.
 ## Next milestones
 
 To be defined together -- likely candidates once M1 is live: `ssvepBeh` and

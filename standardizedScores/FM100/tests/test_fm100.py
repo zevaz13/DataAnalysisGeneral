@@ -264,6 +264,47 @@ def test_plot_group_fm100_cap_labels_only_applied_for_radial(df):
     assert ax.get_xlim() == (1.0, 85.0)
 
 
+# --- multi-subject / group-vs-subject overlays (dashboard M2) ---------------
+
+
+def test_plot_subjects_fm100_draws_one_line_per_subject(df):
+    sub_ids = sorted(df["sub_id"].unique())[:3]
+    ax = plotting.plot_subjects_fm100(df, sub_ids)
+    assert len(ax.lines) == len(sub_ids)
+
+
+def test_plot_subjects_fm100_rejects_more_subjects_than_subject_colors(df):
+    sub_ids = sorted(df["sub_id"].unique())[: len(plotting.SUBJECT_COLORS) + 1]
+    with pytest.raises(ValueError):
+        plotting.plot_subjects_fm100(df, sub_ids)
+
+
+def test_plot_subjects_fm100_uses_session_1_only(df):
+    """A subject with session 1 and 2 must contribute one line, session 1's,
+    not one per session (unlike plot_subject_fm100's own overlay)."""
+    session_counts = df.groupby("sub_id")["session"].nunique()
+    two_session_subject = session_counts[session_counts == 2].index[0]
+    ax = plotting.plot_subjects_fm100(df, [two_session_subject])
+    expected = plotting._subject_profile(df, two_session_subject, 1, window=1)
+    np.testing.assert_array_equal(ax.lines[0].get_ydata(), expected)
+
+
+def test_plot_group_vs_subjects_fm100_draws_group_bands_plus_dashed_subject_lines(df):
+    categories = [{"label": "HC", "group": "CTR"}, {"label": "PD", "group": "PD"}]
+    sub_ids = sorted(df["sub_id"].unique())[:2]
+    ax = plotting.plot_group_vs_subjects_fm100(df, categories, sub_ids)
+    assert len(ax.lines) == len(categories) + len(sub_ids)
+    subject_lines = ax.lines[len(categories):]
+    assert all(line.get_linestyle() == "--" for line in subject_lines)
+
+
+def test_plot_group_vs_subjects_fm100_rejects_more_subjects_than_subject_colors(df):
+    categories = [{"label": "HC", "group": "CTR"}]
+    sub_ids = sorted(df["sub_id"].unique())[: len(plotting.SUBJECT_COLORS) + 1]
+    with pytest.raises(ValueError):
+        plotting.plot_group_vs_subjects_fm100(df, categories, sub_ids)
+
+
 # --- comparisons.py: group comparisons and offset (M2) -----------------------
 
 
