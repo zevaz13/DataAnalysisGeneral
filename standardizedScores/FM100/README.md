@@ -60,7 +60,16 @@ in `load_fm100_raw` drops it.
   function creates it) grows cap numbers clockwise (M3, matching
   `fm100radialTemplate.png` -- matplotlib's own polar default is
   counterclockwise), set once in the shared `_new_axes` helper so the data
-  line, wheel ring, and any tick labels stay mutually consistent.
+  line, wheel ring, and any tick labels stay mutually consistent. Every
+  radial axes also gets a padded inner origin (M3, `_apply_radial_hole`,
+  `ax.set_rorigin`) so a cap with `err_vals=0` doesn't plunge to the exact
+  center and produce a needle spike -- the root cause, it turned out, of
+  why our radial plots looked so much spikier than
+  `MET038RadNoFilt.png`/`MET038_filt.png` (the underlying `err_vals`
+  metric itself was already correct; only the axes geometry was
+  different). `show_cap_colors=True` (M3, linear only) draws
+  `MET038Lin_filt.png`'s row of colored cap dots along the x-axis
+  (`_draw_cap_colors_linear`), the linear counterpart to `show_cap_wheel`.
   `group_profiles` (renamed from
   `_group_profiles`, now public) is reused directly by `comparisons.py`'s
   `estimate_offset`. `plot_feature_boxplot`/`plot_feature_boxplots_grid`

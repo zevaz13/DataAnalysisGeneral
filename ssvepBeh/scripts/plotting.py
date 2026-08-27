@@ -97,7 +97,7 @@ def plot_grid_with_clicks(
     opacity, smaller/more transparent than the notebook defaults gives
     room to shrink these when several panels share limited screen space.
     cmap defaults to EEG_CMAP (viridis); pass a project-specific ramp (e.g.
-    ssveps/scripts/plotting.py's DIVERGING_GREEN_RED) to match that
+    ssveps/scripts/plotting.py's DIVERGING_BLUE_RED) to match that
     project's own normalization-method color convention. vmin/vmax default
     to None (per-panel autoscale, as before) -- plot_grids_with_clicks passes
     a shared pair so every panel in a multi-panel figure is comparable."""

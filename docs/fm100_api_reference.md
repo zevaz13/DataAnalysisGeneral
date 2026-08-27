@@ -91,14 +91,22 @@ all-pairs one.
   cap 85 (not cap 1) at angle 0, then continues 1, 2, ... 84
   (`_cap_label(position_index) = ((position_index - 1) % 85) + 1`). One
   label every 5th cap (17 labels total). No-op for `kind='linear'`.
-- **`show_cap_wheel=`** (both functions, plus `plot_group_vs_subjects_fm100`,
-  M3): draws `fm100radialTemplate.png`'s outer ring instead --
-  `_draw_cap_wheel` scatters all 85 caps just outside the plotted data,
-  colored by `CAP_WHEEL_CMAP` (a cyclic colormap sampled by each cap's own
-  angular position, approximating the physical hue circle the caps sit on)
-  and individually numbered via `_cap_label`. No every-Nth-cap tradeoff to
-  make, unlike `label_mode='cap'` -- takes priority over `label_mode` when
-  both are set. No-op for `kind='linear'`.
+- **`show_cap_wheel=`** (all four radial-capable functions, M3; added to
+  `plot_subjects_fm100` in the dashboard M2 pass, the one of the four that
+  didn't have it yet): draws `fm100radialTemplate.png`'s outer ring
+  instead -- `_draw_cap_wheel` scatters all 85 caps just outside the
+  plotted data, colored by `CAP_WHEEL_CMAP` (a cyclic colormap sampled by
+  each cap's own angular position, approximating the physical hue circle
+  the caps sit on) and individually numbered via `_cap_label`. No
+  every-Nth-cap tradeoff to make, unlike `label_mode='cap'` -- takes
+  priority over `label_mode` when both are set. No-op for `kind='linear'`.
+  The dashboard defaults this on for every radial plot (`1_FM100.py`).
+- **`show_cap_colors=`** (all four radial-capable functions, M3): the
+  linear-mode counterpart to `show_cap_wheel` -- draws
+  `MET038Lin_filt.png`'s row of colored cap dots along the x-axis
+  (`_draw_cap_colors_linear`) instead of doing nothing. No-op for
+  `kind='radial'`. The dashboard defaults this on for every linear plot too
+  (`1_FM100.py`, dashboard M2).
 - **`_new_axes(kind) -> Axes`** (M3) The one shared creation point for
   every polar/linear axes these three functions build when the caller
   doesn't pass their own `ax=`. `kind='radial'` axes get
@@ -107,6 +115,48 @@ all-pairs one.
   applies uniformly to whatever gets plotted on the axes afterward (the
   error-profile line, `_draw_cap_wheel`'s ring, `_apply_cap_labels`'
   ticks), rather than needing to be replicated per artist.
+- **`_apply_radial_hole(ax)`** (M3) `ax.set_rorigin(-RADIAL_HOLE_FRAC *
+  r_data_max)` -- pads the radial axes' origin inward so a cap with
+  `err_vals=0` doesn't plunge to the exact geometric center (matplotlib's
+  default), which was producing harsh needle spikes `MET038RadNoFilt.png`/
+  `MET038_filt.png` don't have. `RADIAL_HOLE_FRAC=0.27`, tuned against
+  those two reference images. Applied unconditionally by every
+  radial-plotting function via `_finish_radial_axes` below, regardless of
+  `label_mode`/`show_cap_wheel` -- a readability fix, not tied to either.
+  Safe to call more than once (`set_rorigin` doesn't disable autoscaling
+  the way `set_ylim` does): `plot_group_vs_subjects_fm100` calls it again
+  after adding its subject overlays, to correct for their own r-range.
+  **Must run last**, after `_draw_cap_wheel`/`_apply_cap_labels`, not
+  before -- caught in review: `_draw_cap_wheel` calls `ax.set_ylim`,
+  inflating the r-range, and matplotlib's polar rendering computes the
+  *visible* hole as `|rorigin| / (ylim[1] - rorigin)` (only `ylim`'s lower
+  bound locks to `rorigin`; the upper bound stays live and tracks whatever
+  `ylim[1]` currently is) -- locking `rorigin` before the wheel inflated
+  `ylim` rendered a visibly smaller hole than intended. Pinned by
+  `test_show_cap_wheel_does_not_change_the_rendered_hole_size`.
+- **`_finish_radial_axes(ax, *, show_cap_wheel, label_mode)`** (M3) The
+  shared tail for `plot_subject_fm100`/`plot_group_fm100`/
+  `plot_subjects_fm100`'s radial branch: `_draw_cap_wheel` or
+  `_apply_cap_labels`, *then* `_apply_radial_hole` (order matters, see
+  above). Must run after every data series on `ax` is plotted, same reason
+  as `_apply_radial_hole` alone. `plot_group_vs_subjects_fm100` doesn't
+  call this directly (its inner `plot_group_fm100` call already applied
+  `'cap'` tick labels when needed) -- it calls `_draw_cap_wheel`/
+  `_apply_radial_hole` itself instead, in the same order, to avoid a
+  redundant second `_apply_cap_labels`.
+- **`_cap_color(cap_label) -> RGBA`** (M3) `CAP_WHEEL_CMAP`'s color for a
+  1-85 cap label. The inverse of `_cap_label`: label 85 sits at
+  `position_index=0`, every other label `c` sits at `position_index=c`.
+  Used by `_draw_cap_colors_linear` below; `_draw_cap_wheel` keeps its own
+  original `position_index`-indexed coloring (equivalent, left as-is to
+  avoid touching already-verified code) -- pinned equal by
+  `tests/test_fm100.py::test_cap_color_matches_cap_wheel_ordering`.
+- **`_draw_cap_colors_linear(ax, *, step=RADIAL_TICK_STEP)`** (M3) The
+  linear analog of `_draw_cap_wheel`'s ring: small colored dots every
+  `step` cap positions along the bottom of the x-axis
+  (`MET038Lin_filt.png`), `clip_on=False` so they render regardless of
+  `ylim`. Must run after the data is plotted (the y-position is relative
+  to the current y-range).
 - **`group_profiles(df, *, group=None, subgroup=None, sub_ids=None, window=1) -> ndarray`**
   (renamed from `_group_profiles`, now public) One smoothed error profile
   per subject matching the filter (`(n_subjects, 85)`), each subject's own

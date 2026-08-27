@@ -185,6 +185,53 @@ per-project-own-constants convention (no shared palette module).
       `s=`/`alpha=`/`cmap=`/`vmin=`/`vmax=` params and the new
       `plot_grids_with_clicks`, matching this repo's existing
       one-test-per-plot-function-plus-cap-rejection convention.
+- [x] **Dashboard matched to the latest FM100 plotting.py** (M3's radial
+      hole/clockwise-cap fixes were already automatic/unconditional, so
+      nothing to wire up there; `show_cap_wheel`/`show_cap_colors` weren't
+      exposed at all). Checked `beh/`/`ssveps/` for the same kind of drift
+      first (`git log`/`git status` on their `plotting.py` files) -- neither
+      has changed since M2, so this was FM100-only.
+- [x] **Radial FM100 defaults to cap colors.** `1_FM100.py`: `show_cap_wheel
+      = kind == "radial"`, `show_cap_colors = kind == "linear"` -- both
+      plot styles show their cap-color feature automatically now (you
+      confirmed linear should default on too, matching radial). Added
+      `show_cap_wheel` to `plot_subjects_fm100` (`standardizedScores/FM100/
+      scripts/plotting.py`) since the dashboard's multi-participant view
+      needed it and it was the one of the four FM100 plotting functions
+      that didn't have it yet. Removed the now-dead "Radial tick labels"
+      angle/cap sidebar toggle (`show_cap_wheel` always overrides
+      `label_mode` for radial now, so it had no effect left) -- you
+      confirmed removing it rather than leaving it inert.
+- [x] **SSVEP colormaps fixed to match your spec.** `3_SSVEP.py`:
+      `CMAP_OVERRIDES` is now a complete `{normalize_label: cmap}` map
+      instead of a partial one with a `None`/fallback gap -- percent stays
+      `DIVERGING_BLUE_RED`, raw stays `SEQUENTIAL_BLUE` (both unchanged,
+      identical to what `plot_groups_side_by_side`'s own internal default
+      already produced), db changes from `DIVERGING_GREEN_RED` to
+      `overlap_plotting.EEG_CMAP` (viridis). `DIVERGING_GREEN_RED` removed
+      from `ssveps/scripts/plotting.py` (no longer used anywhere; its one
+      other mention, a docstring example in `ssvepBeh/scripts/plotting.py`,
+      now points at `DIVERGING_BLUE_RED` instead).
+- [x] **Behavioral-click overlay no longer forces viridis.** Root cause:
+      both `plot_grids_with_clicks` calls passed `cmap=cmap or
+      overlap_plotting.EEG_CMAP` -- since `cmap` was `None` for percent/raw
+      (no entry in the old partial `CMAP_OVERRIDES`), the `or` always fell
+      through to `EEG_CMAP` (viridis) regardless of the sidebar's
+      normalization selection, ignoring it entirely. With `CMAP_OVERRIDES`
+      now always resolved, both calls just pass `cmap=cmap` directly --
+      verified by rendering all three normalizations with clicks on and
+      reading back each panel's actual `get_cmap()`: percent ->
+      `diverging_blue_red`, db -> `viridis`, raw -> `sequential_blue`, each
+      matching its own non-click counterpart exactly.
+
+Verified via direct call-sequence smoke tests (every FM100 plotting
+function x both `kind`s; every SSVEP normalization x click-overlay on/off,
+reading back the rendered colormap) and an HTTP-level check of the running
+app (`uv run streamlit run dashboard/Home.py`, all four routes 200, no
+tracebacks in the server log) -- same two-layer smoke-test convention as
+M1. Full test suite (244/244, no regressions from removing
+`DIVERGING_GREEN_RED`) plus one new test for `plot_subjects_fm100`'s new
+`show_cap_wheel` param.
 ## Next milestones
 
 To be defined together -- likely candidates once M1 is live: `ssvepBeh` and

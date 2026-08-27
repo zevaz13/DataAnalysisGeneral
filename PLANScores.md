@@ -112,11 +112,56 @@ headline findings.
   keeps everything mutually consistent for free. `01_explore.ipynb`,
   `03_flagged_subjects.ipynb`, `04_hc_vs_pd.ipynb` (every notebook with a
   radial figure) re-executed to pick up the corrected direction.
+- [x] **Radial "donut hole."** Root cause of the mismatch against
+  `MET038RadNoFilt.png`/`MET038_filt.png` (verified, not guessed --
+  `templateCode/FM100.py` has no plotting code, so these came from a
+  legacy tool; the mismatch turned out to be pure axes geometry, not a
+  different error metric -- `err_vals` was already correct). Matplotlib's
+  polar default puts `r=0` at the exact geometric center, so any cap with
+  `err_vals=0` (MET038 has several) plunged straight to the center and
+  shot back out to its neighbors, producing harsh needle spikes the
+  reference images don't have. Fixed with `_apply_radial_hole` --
+  `ax.set_rorigin(-RADIAL_HOLE_FRAC * r_data_max)`, `RADIAL_HOLE_FRAC=0.27`
+  (tuned by rendering MET038 at several candidate fractions against
+  `MET038_filt.png` directly, not eyeballed once). Applied unconditionally
+  to every radial plot (not just `show_cap_wheel` ones) via a new shared
+  `_finish_radial_axes` step -- confirmed `window=5` (your own guess) is a
+  strong visual match for the two `_filt` references once the hole is in
+  place. `plot_group_vs_subjects_fm100` re-applies the hole after its
+  subject overlays are added (same reason `_draw_cap_wheel` already had to
+  be deferred there -- both key off the axes' current data range).
+  **Caught in review and fixed:** the hole must be applied *after*
+  `_draw_cap_wheel`/`_apply_cap_labels`, not before -- `_draw_cap_wheel`
+  calls `ax.set_ylim`, inflating the r-range by ~1.5x, and matplotlib's
+  polar rendering computes the *visible* hole as `|rorigin| / (ylim[1] -
+  rorigin)` (only `ylim`'s lower bound gets locked to `rorigin`; the upper
+  bound stays live). Locking `rorigin` before the wheel ran left the same
+  absolute hole rendering ~26% smaller once the wheel inflated `ylim` --
+  meaning the *default* radial path (no wheel, used by every dashboard
+  call) was rendering at a different, never-actually-validated hole size
+  than the `show_cap_wheel=True` case the reference comparison used.
+  Reordered (`_finish_radial_axes` and `plot_group_vs_subjects_fm100`'s
+  own copy of the same sequence), then `RADIAL_HOLE_FRAC` re-tuned from
+  0.4 to 0.27 against the reference image again under the corrected order
+  -- both paths now render identically (pinned by
+  `test_show_cap_wheel_does_not_change_the_rendered_hole_size` and the
+  `plot_group_vs_subjects_fm100` equivalent).
+- [x] **Cap-color line on linear plots.** `MET038Lin_filt.png`'s row of
+  colored dots along the x-axis, replicated via new `_cap_color(cap_label)`
+  (extracted from `_draw_cap_wheel`'s coloring so both share one
+  definition) and `_draw_cap_colors_linear`, every `RADIAL_TICK_STEP`
+  (5th) cap. New `show_cap_colors=False` param, same opt-in pattern as
+  `show_cap_wheel`, on all four plotting functions.
+- Diameter lines (the red/green/blue lines crossing the center in both
+  radial references) intentionally **not** replicated -- neither of us
+  has a verified source for their exact meaning or cap endpoints.
 
 `standardizedScores/FM100/tests/test_fm100.py` covers every new function
 (correction math, Tukey masking, the wheel's point count and tick
-overrides, the boxplot grid's panel count, the clockwise direction) --
-54/54 passing, 225/225 across the whole repo.
+overrides, the boxplot grid's panel count, the clockwise direction, the
+radial hole and its re-computation on a second call, the cap-color
+strip, and the hole/wheel ordering regression) -- 62/62 passing, 243/243
+across the whole repo.
 
 ## Next milestones
 

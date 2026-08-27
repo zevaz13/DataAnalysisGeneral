@@ -26,7 +26,11 @@ df = load_data()
 st.sidebar.header("Display")
 kind = st.sidebar.radio("Plot style", ["linear", "radial"], index=0)
 window = st.sidebar.slider("Smoothing window", 1, 10, 1)
-label_mode = st.sidebar.radio("Radial tick labels", ["angle", "cap"], index=0, disabled=kind != "radial")
+# Cap colors default on for both styles (PLANdashboard.md M2) -- radial's
+# show_cap_wheel already carries every cap's number, making the old
+# angle/cap tick-label toggle a no-op, so it's gone rather than left dead.
+show_cap_wheel = kind == "radial"
+show_cap_colors = kind == "linear"
 
 group_tab, participant_tab = st.tabs(["Group", "Participant"])
 
@@ -43,9 +47,9 @@ with group_tab:
     st.subheader("Group error profiles")
     if categories:
         if compare_subjects:
-            ax = plotting.plot_group_vs_subjects_fm100(df, categories, compare_subjects, kind=kind, window=window, label_mode=label_mode)
+            ax = plotting.plot_group_vs_subjects_fm100(df, categories, compare_subjects, kind=kind, window=window, show_cap_wheel=show_cap_wheel, show_cap_colors=show_cap_colors)
         else:
-            ax = plotting.plot_group_fm100(df, categories, kind=kind, window=window, label_mode=label_mode)
+            ax = plotting.plot_group_fm100(df, categories, kind=kind, window=window, show_cap_wheel=show_cap_wheel, show_cap_colors=show_cap_colors)
         st.pyplot(ax.figure)
         plt.close(ax.figure)
     else:
@@ -85,11 +89,11 @@ with participant_tab:
         st.info("Select one or more participants in the sidebar.")
     elif len(subjects) == 1:
         st.subheader(f"{subjects[0]}'s own profile (every session)")
-        ax = plotting.plot_subject_fm100(df, subjects[0], kind=kind, window=window, label_mode=label_mode)
+        ax = plotting.plot_subject_fm100(df, subjects[0], kind=kind, window=window, show_cap_wheel=show_cap_wheel, show_cap_colors=show_cap_colors)
         st.pyplot(ax.figure)
         plt.close(ax.figure)
     else:
         st.subheader("Participants (session 1 only)")
-        ax = plotting.plot_subjects_fm100(df, subjects, kind=kind, window=window, label_mode=label_mode)
+        ax = plotting.plot_subjects_fm100(df, subjects, kind=kind, window=window, show_cap_wheel=show_cap_wheel, show_cap_colors=show_cap_colors)
         st.pyplot(ax.figure)
         plt.close(ax.figure)

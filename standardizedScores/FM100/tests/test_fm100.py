@@ -7,6 +7,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
@@ -302,6 +303,15 @@ def test_plot_subjects_fm100_uses_session_1_only(df):
     np.testing.assert_array_equal(ax.lines[0].get_ydata(), expected)
 
 
+def test_plot_subjects_fm100_show_cap_wheel_draws_the_ring(df):
+    """PLANdashboard.md M2: the dashboard needs show_cap_wheel on this
+    function too (previously only on plot_subject_fm100/plot_group_fm100)."""
+    sub_ids = sorted(df["sub_id"].unique())[:2]
+    ax = plotting.plot_subjects_fm100(df, sub_ids, kind="radial", show_cap_wheel=True)
+    wheel = ax.collections[-1]
+    assert wheel.get_offsets().shape[0] == plotting.N_CAPS
+
+
 def test_plot_group_vs_subjects_fm100_draws_group_bands_plus_dashed_subject_lines(df):
     categories = [{"label": "HC", "group": "CTR"}, {"label": "PD", "group": "PD"}]
     sub_ids = sorted(df["sub_id"].unique())[:2]
@@ -463,6 +473,16 @@ def test_plot_feature_boxplots_grid_has_one_panel_per_feature(df):
     assert len(on_axes) == len(comparisons.FEATURES)
 
 
+def test_plot_group_vs_subjects_fm100_wheel_does_not_change_the_rendered_hole_size(df):
+    """Same regression as test_show_cap_wheel_does_not_change_the_rendered_hole_size,
+    for plot_group_vs_subjects_fm100's own manual hole/wheel sequence
+    (it doesn't call _finish_radial_axes directly -- see its own comment)."""
+    categories = [{"label": "HC", "group": "CTR"}]
+    with_wheel = plotting.plot_group_vs_subjects_fm100(df, categories, ["MET020"], kind="radial", show_cap_wheel=True)
+    without_wheel = plotting.plot_group_vs_subjects_fm100(df, categories, ["MET020"], kind="radial", show_cap_wheel=False)
+    assert _rendered_hole_fraction(with_wheel) == pytest.approx(_rendered_hole_fraction(without_wheel))
+
+
 def test_show_cap_wheel_does_not_clip_a_subject_overlay_exceeding_the_group_band(df):
     """_draw_cap_wheel calls ax.set_ylim, which disables further
     autoscaling -- if it ran before plot_group_vs_subjects_fm100's dashed
@@ -474,3 +494,86 @@ def test_show_cap_wheel_does_not_clip_a_subject_overlay_exceeding_the_group_band
     assert subject_line.get_label() == "MET020 (individual)"
     r_max_plotted = subject_line.get_xydata()[:, 1].max()
     assert r_max_plotted <= ax.get_ylim()[1]
+
+
+# --- radial hole & linear cap colors (M3) -----------------------------------
+
+
+def test_apply_radial_hole_sets_rorigin_proportional_to_data_max():
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+    ax.plot(plotting.CAP_ANGLES, np.full(plotting.CAP_ANGLES.shape, 10.0))
+    plotting._apply_radial_hole(ax)
+    # ax.get_ylim()[1] rather than the plotted 10.0 directly -- matplotlib's
+    # autoscale adds its own margin, so the two aren't exactly equal.
+    assert ax.get_rorigin() == pytest.approx(-plotting.RADIAL_HOLE_FRAC * ax.get_ylim()[1])
+
+
+def test_apply_radial_hole_recomputes_on_a_second_call_with_more_data():
+    """Safe to call twice (plot_group_vs_subjects_fm100 does, after adding
+    subject overlays) -- the second call must reflect the larger range,
+    not the first call's now-stale one."""
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+    ax.plot(plotting.CAP_ANGLES, np.full(plotting.CAP_ANGLES.shape, 10.0))
+    plotting._apply_radial_hole(ax)
+    first_rorigin = ax.get_rorigin()
+    ax.plot(plotting.CAP_ANGLES, np.full(plotting.CAP_ANGLES.shape, 20.0))
+    plotting._apply_radial_hole(ax)
+    assert ax.get_rorigin() == pytest.approx(-plotting.RADIAL_HOLE_FRAC * ax.get_ylim()[1])
+    assert ax.get_rorigin() < first_rorigin  # more negative -- a bigger hole for the bigger range
+
+
+def test_plot_subject_fm100_radial_applies_the_hole_by_default(df):
+    """MET038 has several caps at err_vals=0 (PLANScores.md M3) -- confirms
+    the hole is actually wired into plot_subject_fm100's default radial
+    path, not just present in _apply_radial_hole's own unit test above."""
+    ax = plotting.plot_subject_fm100(df, "MET038", kind="radial", sessions=[1], window=1)
+    assert ax.get_rorigin() < 0
+
+
+def _rendered_hole_fraction(ax: plt.Axes) -> float:
+    """matplotlib's polar rendering computes the visible hole as
+    |rorigin| / (ylim[1] - rorigin) -- not rorigin alone -- since
+    originViewLim locks only y0 (to rorigin); y1 stays live and tracks
+    ax.viewLim.y1. See _finish_radial_axes's docstring."""
+    rorigin = ax.get_rorigin()
+    return abs(rorigin) / (ax.get_ylim()[1] - rorigin)
+
+
+def test_show_cap_wheel_does_not_change_the_rendered_hole_size(df):
+    """Regression test: _draw_cap_wheel calls ax.set_ylim, inflating the
+    r-range by ~1.5x. _apply_radial_hole must run *after* the wheel (or
+    'cap' labels), not before, or the same absolute rorigin renders a
+    visibly smaller hole once the wheel's set_ylim has run -- caught by
+    code review, verified against matplotlib's actual polar transform
+    (originViewLim locks only y0=rorigin; y1 stays live)."""
+    with_wheel = plotting.plot_subject_fm100(df, "MET038", kind="radial", sessions=[1], window=5, show_cap_wheel=True)
+    without_wheel = plotting.plot_subject_fm100(df, "MET038", kind="radial", sessions=[1], window=5)
+    assert _rendered_hole_fraction(with_wheel) == pytest.approx(_rendered_hole_fraction(without_wheel))
+
+
+def test_cap_color_matches_cap_wheel_ordering():
+    """_cap_color(cap_label) must agree with _draw_cap_wheel's own
+    position_index-based coloring -- they're independent code paths (kept
+    separate to avoid touching already-verified wheel code) that need to
+    produce the same color for the same cap."""
+    for position_index in range(plotting.N_CAPS):
+        label = plotting._cap_label(position_index)
+        expected = plotting.CAP_WHEEL_CMAP(position_index / plotting.N_CAPS)
+        assert plotting._cap_color(label) == expected
+
+
+def test_draw_cap_colors_linear_adds_one_scatter_per_sampled_cap():
+    fig, ax = plt.subplots()
+    ax.plot(plotting.CAP_POSITIONS, np.ones_like(plotting.CAP_POSITIONS, dtype=float))
+    n_before = len(ax.collections)
+    plotting._draw_cap_colors_linear(ax)
+    assert len(ax.collections) == n_before + 1
+    n_expected = len(np.arange(1, 86, plotting.RADIAL_TICK_STEP))
+    assert ax.collections[-1].get_offsets().shape[0] == n_expected
+
+
+def test_show_cap_colors_places_dots_below_the_data_range(df):
+    ax = plotting.plot_subject_fm100(df, "MET038", kind="linear", sessions=[1], show_cap_colors=True)
+    dots_y = ax.collections[-1].get_offsets()[:, 1]
+    line_y = ax.lines[0].get_ydata()
+    assert dots_y.max() < line_y.min()

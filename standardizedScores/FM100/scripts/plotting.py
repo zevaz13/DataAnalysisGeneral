@@ -121,7 +121,75 @@ def _apply_cap_labels(ax: plt.Axes, *, step: int = RADIAL_TICK_STEP) -> None:
     ax.set_xticklabels([str(_cap_label(i)) for i in indices])
 
 
+RADIAL_HOLE_FRAC = 0.27  # tuned against MET038_filt.png/MET038RadNoFilt.png (PLANScores.md M3) -- re-tuned after fixing _finish_radial_axes's hole-before-wheel ordering bug, which had made 0.4 render correctly only when show_cap_wheel=True (see plotting.py's own test/docstring history for the ordering fix)
+
+
+def _apply_radial_hole(ax: plt.Axes) -> None:
+    """Pads the radial axes' origin inward (fm100radialTemplate.png /
+    MET038RadNoFilt.png), so a cap with err_vals=0 doesn't plunge to the
+    exact geometric center. Without this, matplotlib's default r=0-at-center
+    makes the line touch dead center at any perfectly-placed cap and shoot
+    back out to its neighbors' (much larger) values -- a harsh, needle-like
+    spike unrelated to the actual data shape. Applied unconditionally to
+    every radial plot, not just show_cap_wheel ones -- it's a readability
+    fix independent of which label mode is active.
+
+    Safe to call more than once (plot_group_vs_subjects_fm100 calls it
+    again after adding subject overlays, to correct for their own r-range):
+    unlike set_ylim, set_rorigin doesn't disable autoscaling or change what
+    ax.get_ylim() reports, so a later call simply recomputes the offset
+    against however much data is on the axes by then."""
+    r_data_max = ax.get_ylim()[1]
+    ax.set_rorigin(-RADIAL_HOLE_FRAC * r_data_max)
+
+
 CAP_WHEEL_CMAP = plt.cm.hsv  # cyclic colormap sampled at each cap's own angular position -- the caps sit on one continuous hue circle, so angular position doubles as an approximate hue (fm100radialTemplate.png)
+
+
+def _cap_color(cap_label: int):
+    """CAP_WHEEL_CMAP's color for a given 1-85 cap label (not a position
+    index) -- the inverse of _cap_label: position_index 0 holds label 85,
+    every other position_index i (1-84) holds label i, so label c's own
+    position_index is 0 for c=85, else c. Used by _draw_cap_colors_linear;
+    _draw_cap_wheel indexes CAP_WHEEL_CMAP by position_index directly
+    (equivalent, kept as-is to avoid touching already-verified code)."""
+    position_index = 0 if cap_label == N_CAPS else cap_label
+    return CAP_WHEEL_CMAP(position_index / N_CAPS)
+
+
+def _draw_cap_colors_linear(ax: plt.Axes, *, step: int = RADIAL_TICK_STEP) -> None:
+    """Small colored dots every `step` cap positions along the bottom of a
+    linear plot's x-axis (MET038Lin_filt.png) -- the linear analog of
+    _draw_cap_wheel's ring, using the same per-cap color (_cap_color).
+    clip_on=False so the dots render just below the axes regardless of
+    ylim; must run after every data series on ax is plotted, same as
+    _apply_radial_hole, since the y-position is relative to the current
+    auto-scaled y-range."""
+    positions = np.arange(1, N_CAPS + 1, step)
+    y0, y1 = ax.get_ylim()
+    y_dots = y0 - 0.04 * (y1 - y0)
+    colors = [_cap_color(p) for p in positions]
+    ax.scatter(positions, np.full(len(positions), y_dots), c=colors, s=40, edgecolor="white", linewidth=0.5, clip_on=False, zorder=5)
+
+
+def _finish_radial_axes(ax: plt.Axes, *, show_cap_wheel: bool, label_mode: str) -> None:
+    """Common radial-axes finishing step: the cap-wheel ring or 'cap' tick
+    labels, *then* the M3 rorigin hole (always, regardless of label_mode)
+    -- in that order, not the reverse. _draw_cap_wheel calls ax.set_ylim,
+    inflating the r-range by ~1.5x; matplotlib's polar rendering computes
+    the *visible* hole fraction as |rorigin| / (ylim[1] - rorigin), which
+    depends on ylim[1] at draw time, not at the moment set_rorigin was
+    called (rorigin itself doesn't move, but the axes it's a fraction of
+    does). Locking rorigin before the wheel inflates ylim would leave the
+    same absolute hole looking ~26% smaller once the wheel's own set_ylim
+    runs -- so _apply_radial_hole must run last, after ylim has reached
+    its final value, for every radial render to get the same *visible*
+    hole size regardless of show_cap_wheel/label_mode."""
+    if show_cap_wheel:
+        _draw_cap_wheel(ax)
+    elif label_mode == "cap":
+        _apply_cap_labels(ax)
+    _apply_radial_hole(ax)
 
 
 def _draw_cap_wheel(ax: plt.Axes) -> None:
@@ -153,6 +221,7 @@ def plot_subject_fm100(
     window: int = 1,
     label_mode: str = "angle",
     show_cap_wheel: bool = False,
+    show_cap_colors: bool = False,
     ax: plt.Axes | None = None,
 ) -> plt.Axes:
     """One participant's error profile, one line per session overlaid
@@ -164,7 +233,9 @@ def plot_subject_fm100(
     show_cap_wheel (radial only): draws fm100radialTemplate.png's colored
     cap-number ring around the data (_draw_cap_wheel) instead of tick
     labels -- takes priority over label_mode when both are set, since the
-    ring already carries every cap's number."""
+    ring already carries every cap's number. show_cap_colors (linear
+    only): the same per-cap colors as a row of dots along the x-axis
+    (MET038Lin_filt.png, _draw_cap_colors_linear)."""
     if kind not in ("linear", "radial"):
         raise ValueError(f"kind must be 'linear' or 'radial', got {kind!r}")
     if label_mode not in ("angle", "cap"):
@@ -182,12 +253,11 @@ def plot_subject_fm100(
 
     if kind == "linear":
         _style_linear_axes(ax, title=sub_id)
+        if show_cap_colors:
+            _draw_cap_colors_linear(ax)
     else:
         ax.set_title(sub_id)
-        if show_cap_wheel:
-            _draw_cap_wheel(ax)
-        elif label_mode == "cap":
-            _apply_cap_labels(ax)
+        _finish_radial_axes(ax, show_cap_wheel=show_cap_wheel, label_mode=label_mode)
     ax.legend(fontsize=8)
     return ax
 
@@ -200,6 +270,7 @@ def plot_group_fm100(
     window: int = 1,
     label_mode: str = "angle",
     show_cap_wheel: bool = False,
+    show_cap_colors: bool = False,
     ax: plt.Axes | None = None,
 ) -> plt.Axes:
     """One line + shaded +-1 SD band per category -- categories is the same
@@ -208,9 +279,9 @@ def plot_group_fm100(
     averaged first, see group_profiles) to that category's mean/SD, so the
     ±1 SD band reflects subject-to-subject spread, not session count.
     kind='linear' or 'radial'. label_mode (radial only): 'angle' (default)
-    or 'cap' (see plot_subject_fm100). show_cap_wheel (radial only): see
-    plot_subject_fm100 -- takes priority over label_mode when both are set.
-    Up to len(FULL_PALETTE) (8) categories -- a line chart, so the dataviz
+    or 'cap' (see plot_subject_fm100). show_cap_wheel (radial only) and
+    show_cap_colors (linear only): see plot_subject_fm100. Up to
+    len(FULL_PALETTE) (8) categories -- a line chart, so the dataviz
     skill's adjacent-pair color rule applies, not the stricter all-pairs
     scatter cap."""
     if kind not in ("linear", "radial"):
@@ -234,12 +305,11 @@ def plot_group_fm100(
 
     if kind == "linear":
         _style_linear_axes(ax, title="Group FM100 error profile (mean ± 1 SD)")
+        if show_cap_colors:
+            _draw_cap_colors_linear(ax)
     else:
         ax.set_title("Group FM100 error profile (mean ± 1 SD)")
-        if show_cap_wheel:
-            _draw_cap_wheel(ax)
-        elif label_mode == "cap":
-            _apply_cap_labels(ax)
+        _finish_radial_axes(ax, show_cap_wheel=show_cap_wheel, label_mode=label_mode)
     ax.legend(fontsize=8)
     return ax
 
@@ -251,13 +321,18 @@ def plot_subjects_fm100(
     kind: str = "linear",
     window: int = 1,
     label_mode: str = "angle",
+    show_cap_wheel: bool = False,
+    show_cap_colors: bool = False,
     ax: plt.Axes | None = None,
 ) -> plt.Axes:
     """Multiple participants overlaid, one color each (dashboard M2). Unlike
     plot_subject_fm100 (one subject, one line per session), this always
     plots session 1 only per subject -- with several subjects already
     competing for color, adding a second line style per subject for session
-    would overload the legend. Up to len(SUBJECT_COLORS) (4) subjects."""
+    would overload the legend. Up to len(SUBJECT_COLORS) (4) subjects.
+    show_cap_wheel (radial only) and show_cap_colors (linear only): see
+    plot_subject_fm100. Every radial render also gets the M3 rorigin hole
+    regardless (_finish_radial_axes)."""
     if len(sub_ids) > len(SUBJECT_COLORS):
         raise ValueError(f"plot_subjects_fm100 supports at most {len(SUBJECT_COLORS)} subjects, got {len(sub_ids)}")
     if kind not in ("linear", "radial"):
@@ -275,10 +350,11 @@ def plot_subjects_fm100(
 
     if kind == "linear":
         _style_linear_axes(ax, title="Participants (session 1)")
+        if show_cap_colors:
+            _draw_cap_colors_linear(ax)
     else:
         ax.set_title("Participants (session 1)")
-        if label_mode == "cap":
-            _apply_cap_labels(ax)
+        _finish_radial_axes(ax, show_cap_wheel=show_cap_wheel, label_mode=label_mode)
     ax.legend(fontsize=8)
     return ax
 
@@ -385,6 +461,7 @@ def plot_group_vs_subjects_fm100(
     window: int = 1,
     label_mode: str = "angle",
     show_cap_wheel: bool = False,
+    show_cap_colors: bool = False,
 ) -> plt.Axes:
     """plot_group_fm100's category bands (solid line + shaded SD, same
     FULL_PALETTE colors) with individual participants' session-1 profiles
@@ -393,16 +470,19 @@ def plot_group_vs_subjects_fm100(
     distinguishing encoding, not color alone, since a subject's color can
     coincide with an unrelated category's -- consistent with the dataviz
     skill's "identity is never color-alone" rule. show_cap_wheel (radial
-    only): see plot_subject_fm100 -- drawn last, after the subject overlays
-    below, not inside the plot_group_fm100 call: _draw_cap_wheel calls
-    ax.set_ylim, which disables further autoscaling, so drawing it before
-    the overlays would silently clip any subject line reaching past the
-    group bands' own range. Up to len(SUBJECT_COLORS) (4) subjects;
-    categories follows plot_group_fm100's own cap."""
+    only) and show_cap_colors (linear only): see plot_subject_fm100 --
+    both applied last, after the subject overlays below, not inside the
+    plot_group_fm100 call: _draw_cap_wheel/_apply_radial_hole/
+    _draw_cap_colors_linear all key off ax's current auto-scaled range, and
+    _draw_cap_wheel specifically calls ax.set_ylim (disabling further
+    autoscaling), so applying any of them before the overlays would use an
+    incomplete range or (for the wheel) silently clip a subject line
+    reaching past the group bands' own range. Up to len(SUBJECT_COLORS) (4)
+    subjects; categories follows plot_group_fm100's own cap."""
     if len(sub_ids) > len(SUBJECT_COLORS):
         raise ValueError(f"plot_group_vs_subjects_fm100 supports at most {len(SUBJECT_COLORS)} subjects, got {len(sub_ids)}")
     inner_label_mode = "angle" if show_cap_wheel else label_mode  # avoid an _apply_cap_labels call show_cap_wheel is about to override anyway
-    ax = plot_group_fm100(df, categories, kind=kind, window=window, label_mode=inner_label_mode, show_cap_wheel=False)
+    ax = plot_group_fm100(df, categories, kind=kind, window=window, label_mode=inner_label_mode, show_cap_wheel=False, show_cap_colors=False)
 
     x = CAP_ANGLES if kind == "radial" else CAP_POSITIONS
     for sub_id, color in zip(sub_ids, SUBJECT_COLORS):
@@ -410,7 +490,18 @@ def plot_group_vs_subjects_fm100(
         plot_x, plot_y = _radial_xy(x, profile, kind=kind)
         ax.plot(plot_x, plot_y, color=color, linewidth=2, linestyle="--", label=f"{sub_id} (individual)")
 
-    if kind == "radial" and show_cap_wheel:
-        _draw_cap_wheel(ax)
+    if kind == "radial":
+        # Not _finish_radial_axes: the inner plot_group_fm100 call already
+        # applied 'cap' tick labels via inner_label_mode when
+        # show_cap_wheel=False, so re-running that branch here would be a
+        # harmless but redundant second _apply_cap_labels call. Wheel
+        # before hole, same reason as _finish_radial_axes: _draw_cap_wheel
+        # inflates ylim, and the hole must be sized against ylim's final
+        # value, not whatever it was before the wheel ran.
+        if show_cap_wheel:
+            _draw_cap_wheel(ax)
+        _apply_radial_hole(ax)
+    elif show_cap_colors:
+        _draw_cap_colors_linear(ax)
     ax.legend(fontsize=8)
     return ax

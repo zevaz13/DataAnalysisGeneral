@@ -27,7 +27,19 @@ NORMALIZE_OPTIONS = {
     "db": {"scope": "run", "trials": "all", "method": "db"},
     "raw": None,
 }
-CMAP_OVERRIDES = {"db": plotting.DIVERGING_GREEN_RED}  # percent/raw keep each function's own default ramp
+# One resolved cmap per normalization, always -- not a partial override with
+# a None fallback. percent/raw match plot_groups_side_by_side's own
+# cmap or _default_cmap(normalize is not None) default exactly (no visual
+# change); db is viridis (PLANdashboard.md M2, was DIVERGING_GREEN_RED).
+# Resolving all three here means the click-overlay views below can pass
+# this cmap straight through instead of falling back to a hardcoded
+# ramp when it's unset, which was the actual bug: overlap_plotting.EEG_CMAP
+# (viridis) firing for percent/raw regardless of the sidebar selection.
+CMAP_OVERRIDES = {
+    "percent change (default)": plotting.DIVERGING_BLUE_RED,
+    "db": overlap_plotting.EEG_CMAP,
+    "raw": plotting.SEQUENTIAL_BLUE,
+}
 
 
 @st.cache_data
@@ -46,7 +58,7 @@ beh_df = load_behavioral()
 st.sidebar.header("Normalization")
 normalize_label = st.sidebar.radio("Normalization", list(NORMALIZE_OPTIONS), index=0)
 normalize = NORMALIZE_OPTIONS[normalize_label]
-cmap = CMAP_OVERRIDES.get(normalize_label)
+cmap = CMAP_OVERRIDES[normalize_label]
 
 st.sidebar.header("Behavioral overlay")
 show_clicks = st.sidebar.checkbox("Show behavioral clicks on the maps")
@@ -80,7 +92,7 @@ with groups_tab:
             clicks_dfs = [beh_df[beh_df["sub_id"].isin(sub_ids)] for sub_ids in sub_id_lists]
             titles = [f"{cat['label']} (n={len(sub_ids)})" for cat, sub_ids in zip(categories, sub_id_lists)]
             fig = overlap_plotting.plot_grids_with_clicks(
-                grids, clicks_dfs, titles, s=OVERLAY_SIZE, alpha=OVERLAY_ALPHA, cmap=cmap or overlap_plotting.EEG_CMAP,
+                grids, clicks_dfs, titles, s=OVERLAY_SIZE, alpha=OVERLAY_ALPHA, cmap=cmap,
                 diverging=normalize is not None, suptitle=f"session {SESSION} -- groups side by side, with behavioral clicks",
             )
         else:
@@ -135,7 +147,7 @@ with individuals_tab:
             grids = [analysis.mean_grid(runmap_df, baselines_df, sub_id, SESSION, normalize=normalize) for sub_id in subjects]
             clicks_dfs = [beh_df[beh_df["sub_id"] == sub_id] for sub_id in subjects]
             fig = overlap_plotting.plot_grids_with_clicks(
-                grids, clicks_dfs, subjects, s=OVERLAY_SIZE, alpha=OVERLAY_ALPHA, cmap=cmap or overlap_plotting.EEG_CMAP,
+                grids, clicks_dfs, subjects, s=OVERLAY_SIZE, alpha=OVERLAY_ALPHA, cmap=cmap,
                 diverging=normalize is not None, suptitle=f"session {SESSION} -- selected participants, with behavioral clicks",
             )
         else:
