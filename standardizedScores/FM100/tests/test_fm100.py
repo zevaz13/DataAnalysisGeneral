@@ -361,3 +361,103 @@ def test_estimate_offset_ci_includes_zero_when_there_is_no_offset():
     result = comparisons.estimate_offset(base, same, n_boot=500, seed=0)
     assert result["ci_lower"] < 0 < result["ci_upper"]
     assert result["p_value"] > 0.05
+
+
+# --- multiple-comparisons correction & outlier flagging (M3) ---------------
+
+
+def test_correct_multiple_comparisons_adds_expected_columns():
+    result = pd.DataFrame({"p_value": [0.001, 0.02, 0.5]})
+    corrected = comparisons.correct_multiple_comparisons(result)
+    assert list(corrected.columns) == ["p_value", "p_corrected", "significant"]
+    assert (corrected["p_corrected"] >= corrected["p_value"]).all()  # Holm never lowers a p-value
+    assert (corrected["p_corrected"] <= 1.0).all()
+
+
+def test_correct_multiple_comparisons_can_flip_significance():
+    """Even the smallest p-value in a family shouldn't survive correction if
+    it isn't small enough relative to the family size -- pins the same
+    'some uncorrected-significant rows don't survive' behavior
+    02_group_comparisons.ipynb reports on real data (CTR vs PD's own six
+    p-values, smallest first)."""
+    result = pd.DataFrame({"p_value": [0.008648, 0.010223, 0.016728, 0.018148, 0.018159, 0.842472]})
+    corrected = comparisons.correct_multiple_comparisons(result)
+    assert result.loc[0, "p_value"] < 0.05  # uncorrected-significant
+    assert not corrected.loc[0, "significant"]  # doesn't survive Holm at this family size
+
+
+def test_tukey_outlier_mask_flags_a_clear_outlier():
+    values = np.array([10, 11, 9, 10.5, 9.5, 100])
+    mask = comparisons.tukey_outlier_mask(values)
+    assert mask.tolist() == [False, False, False, False, False, True]
+
+
+def test_tukey_outlier_mask_flags_nothing_when_evenly_spread():
+    values = np.linspace(0, 1, 20)
+    assert not comparisons.tukey_outlier_mask(values).any()
+
+
+def test_subject_feature_outliers_one_row_per_subject_with_n_flagged(df):
+    result = comparisons.subject_feature_outliers(df, group="CTR")
+    assert len(result) == len(loader.subjects_in_group(df, group="CTR"))
+    assert set(comparisons.FEATURES).issubset(result.columns)
+    assert (result["n_flagged"] == result[comparisons.FEATURES].sum(axis=1)).all()
+    assert result["n_flagged"].max() <= len(comparisons.FEATURES)
+
+
+# --- radial cap wheel & feature boxplots (M3) -------------------------------
+
+
+def test_show_cap_wheel_draws_n_caps_dots_and_blanks_radial_ticks(df):
+    ax = plotting.plot_subject_fm100(df, "MET001", kind="radial", sessions=[1], show_cap_wheel=True)
+    wheel = ax.collections[-1]  # the cap-color scatter, added after the profile line
+    assert wheel.get_offsets().shape[0] == scores.N_CAPS
+    assert all(label.get_text() == "" for label in ax.get_yticklabels())
+
+
+def test_show_cap_wheel_overrides_label_mode_cap(df):
+    """Both set: the ring (which already carries every cap's number) wins,
+    _apply_cap_labels' every-Nth-cap ticks are never applied."""
+    ax = plotting.plot_subject_fm100(df, "MET001", kind="radial", sessions=[1], show_cap_wheel=True, label_mode="cap")
+    labels = [t.get_text() for t in ax.get_xticklabels()]
+    assert labels != [str(plotting._cap_label(i)) for i in range(0, 85, plotting.RADIAL_TICK_STEP)]
+
+
+def test_plot_feature_boxplot_draws_one_box_per_category(df):
+    categories = [{"label": "CTR", "group": "CTR"}, {"label": "PD", "group": "PD"}]
+    ax = plotting.plot_feature_boxplot(df, "TES", categories)
+    assert len(ax.get_xticks()) == len(categories)
+
+
+def test_plot_feature_boxplot_scatters_every_subject(df):
+    categories = [{"label": "PD", "group": "PD"}]
+    ax = plotting.plot_feature_boxplot(df, "TES", categories)
+    n_pd = len(loader.subjects_in_group(df, group="PD"))
+    n_scattered = sum(c.get_offsets().shape[0] for c in ax.collections)
+    assert n_scattered == n_pd
+
+
+def test_plot_feature_boxplot_rejects_more_categories_than_full_palette(df):
+    categories = [{"label": str(i), "group": "CTR"} for i in range(len(plotting.FULL_PALETTE) + 1)]
+    with pytest.raises(ValueError):
+        plotting.plot_feature_boxplot(df, "TES", categories)
+
+
+def test_plot_feature_boxplots_grid_has_one_panel_per_feature(df):
+    categories = [{"label": "CTR", "group": "CTR"}, {"label": "PD", "group": "PD"}]
+    fig = plotting.plot_feature_boxplots_grid(df, categories)
+    on_axes = [ax for ax in fig.axes if ax.has_data()]
+    assert len(on_axes) == len(comparisons.FEATURES)
+
+
+def test_show_cap_wheel_does_not_clip_a_subject_overlay_exceeding_the_group_band(df):
+    """_draw_cap_wheel calls ax.set_ylim, which disables further
+    autoscaling -- if it ran before plot_group_vs_subjects_fm100's dashed
+    subject overlays were added, any subject reaching past the group
+    bands' own r-range would get silently clipped at the frozen limit."""
+    categories = [{"label": "HC", "group": "CTR"}]
+    ax = plotting.plot_group_vs_subjects_fm100(df, categories, ["MET020"], kind="radial", show_cap_wheel=True)
+    subject_line = ax.lines[-1]  # the dashed MET020 overlay, added last
+    assert subject_line.get_label() == "MET020 (individual)"
+    r_max_plotted = subject_line.get_xydata()[:, 1].max()
+    assert r_max_plotted <= ax.get_ylim()[1]

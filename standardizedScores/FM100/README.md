@@ -51,9 +51,17 @@ in `load_fm100_raw` drops it.
   shading. `label_mode='cap'` (M2) relabels the radial plot's angle ticks
   with the FM100 test's own printed-diagram convention (`85, 5, 10, ... 80`
   -- the sequence starts at cap 85, not cap 1) instead of matplotlib's
-  default angle-in-degrees ticks. `group_profiles` (renamed from
+  default angle-in-degrees ticks. `show_cap_wheel=True` (M3, radial only,
+  takes priority over `label_mode`) draws `fm100radialTemplate.png`'s
+  colored, individually-numbered ring of all 85 caps instead -- always
+  drawn *last*, after every other series on the axes, since it fixes the
+  r-axis limit (disabling further autoscaling), which would silently clip
+  a later-added line reaching past it. `group_profiles` (renamed from
   `_group_profiles`, now public) is reused directly by `comparisons.py`'s
-  `estimate_offset`.
+  `estimate_offset`. `plot_feature_boxplot`/`plot_feature_boxplots_grid`
+  (M3) -- one Tukey-whiskered box per group/subgroup with every subject's
+  own value scattered, jittered, and id-labeled on top; outliers
+  (`comparisons.tukey_outlier_mask`) get a black edge and bold label.
 - `scripts/comparisons.py` -- M2: `compare_fm100_feature` (Mann-Whitney U +
   effect size on `subject_pooled_scores`, mirroring
   `beh/scripts/features.py`'s `compare_shape_feature`) over `FEATURES`
@@ -64,6 +72,11 @@ in `load_fm100_raw` drops it.
   import `ssvep_beh_fm100/`, even though that project already has similar
   per-subject pooling logic) -- keeps this base modality's dependencies
   one-directional, matching the project's layering convention.
+  M3 additions: `correct_multiple_comparisons` (Holm, self-contained copy
+  of `ssvepBeh/scripts/correlation.py`'s function of the same name), and
+  `tukey_outlier_mask`/`subject_feature_outliers` (the 1.5xIQR rule, and a
+  per-subject outlier count against `MAJORITY_FEATURES` used to build the
+  CTR-exclusion list `05_outlier_flagging.ipynb` reruns the offset on).
 
 ## Tests
 
@@ -96,4 +109,12 @@ Each opens with `sys.path.append('../scripts')`, so run them with
   `estimate_offset`: offset=1.04 (bootstrap 95% CI [0.32, 1.81], p=0.003 --
   a real, non-zero constant), but R2=0.50 -- the constant explains only
   about half of PD's own cap-to-cap shape relative to HC's, so "PD = HC + a
-  number" is a real but partial description, not the whole story.
+  number" is a real but partial description, not the whole story. Plus its
+  M3 addition: Holm-corrected, this pair's per-feature battery has nothing
+  survive (smallest corrected p is 0.052).
+- `05_outlier_flagging.ipynb` -- M3: `plot_feature_boxplots_grid` across
+  CTR/PD/protan/deutan for all 6 `FEATURES`; `subject_feature_outliers`
+  finds only one CTR subject (MET020, already flagged elsewhere in this
+  project) an outlier on a majority of features; rerunning `estimate_offset`
+  with that subject dropped barely moves the offset (1.04 -> 1.11) or its
+  R2 (0.50 -> 0.47) -- the offset pattern isn't riding on one subject.

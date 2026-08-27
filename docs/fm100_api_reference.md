@@ -91,12 +91,30 @@ all-pairs one.
   cap 85 (not cap 1) at angle 0, then continues 1, 2, ... 84
   (`_cap_label(position_index) = ((position_index - 1) % 85) + 1`). One
   label every 5th cap (17 labels total). No-op for `kind='linear'`.
+- **`show_cap_wheel=`** (both functions, plus `plot_group_vs_subjects_fm100`,
+  M3): draws `fm100radialTemplate.png`'s outer ring instead --
+  `_draw_cap_wheel` scatters all 85 caps just outside the plotted data,
+  colored by `CAP_WHEEL_CMAP` (a cyclic colormap sampled by each cap's own
+  angular position, approximating the physical hue circle the caps sit on)
+  and individually numbered via `_cap_label`. No every-Nth-cap tradeoff to
+  make, unlike `label_mode='cap'` -- takes priority over `label_mode` when
+  both are set. No-op for `kind='linear'`.
 - **`group_profiles(df, *, group=None, subgroup=None, sub_ids=None, window=1) -> ndarray`**
   (renamed from `_group_profiles`, now public) One smoothed error profile
   per subject matching the filter (`(n_subjects, 85)`), each subject's own
   sessions averaged together first. `plot_group_fm100`'s own internal
   building block, exposed so `comparisons.py`'s `estimate_offset` can
   bootstrap over the same per-subject profiles without recomputing them.
+- **`plot_feature_boxplot(df, feature, categories, *, seed=0, ax=None) -> Axes`**
+  (M3) One box per category (Tukey 1.5xIQR whiskers, `showfliers=False`),
+  every subject's own value scattered on top with a small horizontal
+  jitter and labeled with their id minus `MET`. Points
+  `comparisons.tukey_outlier_mask` flags against their own category get a
+  black edge and bold label instead of the default white edge/plain gray
+  label. `categories` follows `plot_group_fm100`'s shape; up to
+  `len(FULL_PALETTE)` (8).
+- **`plot_feature_boxplots_grid(df, categories, *, features=comparisons.FEATURES, seed=0) -> Figure`**
+  (M3) `plot_feature_boxplot`, one panel per feature in a 2-column grid.
 
 ## `comparisons.py` -- group comparisons and offset quantification (M2)
 
@@ -145,6 +163,25 @@ circularly, but compared with the same folded-Mann-Whitney approximation
   (caught by this module's own test suite before shipping; see the
   function's docstring). The additive analog of
   `ssveps/scripts/analysis.py`'s `fit_gain_shape` (M8), gain fixed at 1.
+- **`correct_multiple_comparisons(result, *, method='holm', alpha=0.05) -> DataFrame`**
+  (M3) Adds `p_corrected`/`significant` columns to any DataFrame with a
+  `p_value` column, via `statsmodels.stats.multitest.multipletests`. A
+  self-contained copy of `ssvepBeh/scripts/correlation.py`'s function of
+  the same name (not imported from there, same no-cross-import
+  convention). Scoped to whatever rows are passed in -- call once per
+  comparison pair (`FEATURES` gives 6 tests/family).
+- **`tukey_outlier_mask(values) -> ndarray[bool]`**
+  (M3) Classic Tukey rule: `True` where a value falls more than 1.5xIQR
+  beyond its own `[Q1, Q3]` box -- the same rule matplotlib's own
+  `boxplot(showfliers=True)` uses. Shared by `plot_feature_boxplot` and
+  `subject_feature_outliers`.
+- **`subject_feature_outliers(df, *, group=None, subgroup=None, features=FEATURES) -> DataFrame`**
+  (M3) One row per subject, one bool column per feature
+  (`tukey_outlier_mask` against that group's own `group_pooled_scores`)
+  plus `n_flagged`. `MAJORITY_FEATURES = 4` (> half of `FEATURES`) is the
+  exclusion threshold `05_outlier_flagging.ipynb` uses to rerun the HC-vs-PD
+  offset without CTR subjects who look unlike their own group on most
+  features.
 
 ## Notebooks
 
@@ -167,8 +204,15 @@ Each opens with `sys.path.append('../scripts')`, so run them with
   then a combined `plot_group_fm100` with `sub_ids=` for all three.
   *Edit:* `flagged` (top cell) for a different set of subjects.
 - **`04_hc_vs_pd.ipynb`** -- M2: HC vs PD profiles side by side (both
-  `kind`s), the `compare_fm100_feature` battery filtered to this pair, and
-  `comparisons.estimate_offset(plotting.group_profiles(df, group='CTR'),
-  plotting.group_profiles(df, group='PD'))` with a plot overlaying HC's
-  mean, PD's mean, and "HC + offset" to show the fit visually. *Edit:*
-  `categories` (top cell) for a different pair.
+  `kind`s), the `compare_fm100_feature` battery filtered to this pair
+  (plus its M3 `correct_multiple_comparisons` addition -- nothing survives
+  at this family size), and `comparisons.estimate_offset(plotting.group_profiles(df,
+  group='CTR'), plotting.group_profiles(df, group='PD'))` with a plot
+  overlaying HC's mean, PD's mean, and "HC + offset" to show the fit
+  visually. *Edit:* `categories` (top cell) for a different pair.
+- **`05_outlier_flagging.ipynb`** -- M3: `plot_feature_boxplots_grid` for
+  CTR/PD/protan/deutan across all 6 `FEATURES`; `subject_feature_outliers`
+  to list which CTR subjects are flagged, and on how many features; the
+  `MAJORITY_FEATURES`-threshold exclusion list (one subject, MET020); and
+  `estimate_offset` rerun on HC-minus-that-subject vs. PD, compared
+  side by side with `04_hc_vs_pd.ipynb`'s original numbers.

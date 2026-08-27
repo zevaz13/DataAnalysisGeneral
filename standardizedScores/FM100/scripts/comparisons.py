@@ -25,12 +25,14 @@ for orientation_deg (valid as long as a group's angles don't straddle the
 import numpy as np
 import pandas as pd
 import pingouin as pg
+from statsmodels.stats.multitest import multipletests
 
 from loader import subjects_in_group
 from scores import build_scores
 
 FEATURES = ["TES", "PES_RG", "PES_BY", "VKS_MajRad", "VKS_MinRad", "VKS_Angle"]
 ANGLE_FEATURE = "VKS_Angle"
+MAJORITY_FEATURES = 4  # > half of len(FEATURES) (6) -- M3's "outlier on most/all features" exclusion rule
 
 
 def _circ_mean_deg_axial(angles_deg: np.ndarray) -> float:
@@ -151,3 +153,57 @@ def estimate_offset(profiles1: np.ndarray, profiles2: np.ndarray, *, n_boot: int
     p_value = min(1.0, 2 * min((1 + (boot_offsets <= 0).sum(), 1 + (boot_offsets >= 0).sum())) / (1 + n_boot))
 
     return {"offset": offset, "ci_lower": float(ci_lower), "ci_upper": float(ci_upper), "p_value": float(p_value), "r_squared": float(r_squared)}
+
+
+def correct_multiple_comparisons(result: pd.DataFrame, *, method: str = "holm", alpha: float = 0.05) -> pd.DataFrame:
+    """Adds p_corrected and significant columns to a compare_fm100_feature
+    battery (or any DataFrame with a p_value column), via
+    statsmodels.stats.multitest.multipletests. A self-contained copy of
+    ssvepBeh/scripts/correlation.py's function of the same name and same
+    behavior -- not imported from there, matching this module's own
+    no-cross-import convention (see module docstring: base modalities don't
+    depend on the modules that combine them).
+
+    method='holm' (default) controls the family-wise error rate --
+    conservative, the appropriate first pass before treating any individual
+    feature comparison as confirmed rather than exploratory. Pass
+    method='fdr_bh' (Benjamini-Hochberg) for more power at the cost of a
+    weaker guarantee.
+
+    Correction is scoped to whatever rows are passed in -- call once per
+    comparison pair (FEATURES gives 6 tests per pair), not on a
+    concatenation of several pairs, matching how 02_group_comparisons.ipynb
+    and 04_hc_vs_pd.ipynb report results (one family per pair)."""
+    result = result.copy()
+    reject, p_corrected, _, _ = multipletests(result["p_value"], alpha=alpha, method=method)
+    result["p_corrected"] = p_corrected
+    result["significant"] = reject
+    return result
+
+
+def tukey_outlier_mask(values: np.ndarray) -> np.ndarray:
+    """Classic Tukey boxplot rule: True where a value falls more than
+    1.5*IQR beyond its own [Q1, Q3] box -- the same rule matplotlib's own
+    boxplot(showfliers=True) uses to draw fliers. Exposed here so
+    plotting.plot_feature_boxplot and subject_feature_outliers below share
+    one definition of "outlier" (M3)."""
+    values = np.asarray(values, dtype=float)
+    q1, q3 = np.percentile(values, [25, 75])
+    iqr = q3 - q1
+    lower, upper = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+    return (values < lower) | (values > upper)
+
+
+def subject_feature_outliers(df: pd.DataFrame, *, group: str | None = None, subgroup: str | None = None, features: list[str] = FEATURES) -> pd.DataFrame:
+    """One row per subject in the group/subgroup, one bool column per
+    feature in `features` (tukey_outlier_mask against that group's own
+    distribution on subject_pooled_scores) plus n_flagged (how many
+    features flag that subject) -- the input to M3's CTR-exclusion
+    criterion for the offset re-run: outlier on most/all of FEATURES
+    (n_flagged >= MAJORITY_FEATURES)."""
+    pooled = group_pooled_scores(df, group=group, subgroup=subgroup)
+    out = pooled[["sub_id"]].copy()
+    for feat in features:
+        out[feat] = tukey_outlier_mask(pooled[feat].to_numpy())
+    out["n_flagged"] = out[features].sum(axis=1)
+    return out.reset_index(drop=True)

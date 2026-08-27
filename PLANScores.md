@@ -62,6 +62,48 @@ headline findings.
   of PD's own shape** (R²=0.50) -- "PD looks like HC + a number" is a real,
   statistically solid partial description, not the whole story; real
   per-position structure remains beyond the constant.
+## M3. Cap-color radial wheel, multiple-comparisons correction, outlier flagging
+
+- [x] **Cap-color radial wheel.** `plotting.py` gained `show_cap_wheel=True`
+  (radial only, on `plot_subject_fm100`/`plot_group_fm100`/
+  `plot_group_vs_subjects_fm100`), reproducing
+  `fm100radialTemplate.png`: a ring of all 85 caps drawn just outside the
+  data, colored by a cyclic colormap following each cap's own position on
+  the test's hue circle, every one individually numbered (`_cap_label`) --
+  unlike `label_mode='cap'`'s every-5th-cap ticks, which `show_cap_wheel`
+  takes priority over when both are set. Demoed in `01_explore.ipynb`
+  (MET020).
+- [x] **Multiple-comparisons correction.** `comparisons.correct_multiple_comparisons`
+  (Holm, self-contained copy of `ssvepBeh/scripts/correlation.py`'s
+  function of the same name), applied once per pair (6 features/family) in
+  both `02_group_comparisons.ipynb` and `04_hc_vs_pd.ipynb`. **Real
+  consequence, not just plumbing: CTR vs PD loses every feature under
+  correction** (smallest corrected p is 0.052, `PES_RG`) and protan vs
+  deutan had nothing significant to begin with -- **only HC vs protan and
+  HC vs deutan survive** (11 of the 24 total tests, all magnitude
+  features plus protan's `VKS_Angle`). Matches the "underpowered
+  CTR-vs-PD/protan-vs-deutan, solid HC-vs-subtype" pattern the rest of
+  this project already shows.
+- [x] **Outlier boxplots + flagging.** New `05_outlier_flagging.ipynb`:
+  `plotting.plot_feature_boxplots_grid` (6-feature grid, CTR/PD/protan/
+  deutan side by side, Tukey-rule fliers `comparisons.tukey_outlier_mask`
+  marked distinctly, every subject's own value scattered and labeled by id
+  minus `MET`) for the visual "who looks like deutan / who looks unlike
+  their own group" read, plus `comparisons.subject_feature_outliers` for a
+  reproducible per-subject outlier count. **Only one CTR subject
+  (MET020) is an outlier on a majority of the 6 features** -- already one
+  of this project's own flagged edge cases (`03_flagged_subjects.ipynb`,
+  `docs/findings.md` section 1).
+- [x] **Offset re-run without MET020.** Dropping the one majority-outlier
+  CTR subject barely moves the HC-vs-PD offset (1.04 -> 1.11), tightens
+  the p-value (0.0030 -> 0.0010), and doesn't improve R² (0.505 -> 0.465,
+  if anything slightly worse). **"PD looks like HC + a constant" isn't an
+  artifact of one unusual control** -- a genuine group-level pattern.
+- [ ] Notice how in the template the cap numbers grow clockwise. Our plots should mimic this convention. 
+`standardizedScores/FM100/tests/test_fm100.py` covers every new function
+(correction math, Tukey masking, the wheel's point count and tick
+overrides, the boxplot grid's panel count) -- 51/51 passing, 222/222 across
+the whole repo.
 
 ## Next milestones
 

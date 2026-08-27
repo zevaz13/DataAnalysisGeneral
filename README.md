@@ -26,4 +26,6 @@ Each dataset/topic gets its own top-level directory:
 
 Raw data always lives outside the repo. Where intermediate/processed data is stored is decided per project.
 
-See `PLAN.md` for current milestones and `docs/` for planning documents.
+See `PLAN<project>.md` (repo root, one per project) for current milestones,
+`docs/findings.md` for the results narrative, and **`docs/index.md` for a
+full map of every project, notebook, and doc in this repo.**

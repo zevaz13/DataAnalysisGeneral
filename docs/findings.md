@@ -69,6 +69,37 @@ red-green pattern), well past HC's tight center. The flagged pair
 but non-red-green-specific error, exactly why they were flagged as
 different-deficiency candidates rather than folded into CVD.*
 
+Three follow-on notebooks firmed this up. `02_group_comparisons.ipynb` ran
+the same magnitude/direction features across every group pair: HC vs protan
+and HC vs deutan are significant on every magnitude feature (p<0.02, most
+p<0.001), and the confusion-ellipse direction (`VKS_Angle`) is significant
+for protan (p=0.013) but not deutan (p=0.10) -- an asymmetry that echoes
+what section 5 finds in the behavioral/EEG type-axis story. Protan vs
+deutan comes back with nothing significant on any FM100 feature, the same
+underpowered story every protan-vs-deutan comparison in this project tells
+at n=8 vs 7. `03_flagged_subjects.ipynb` is just MET020/MET047/MET021 side
+by side, in both plot styles, for a closer look at the flagged pair.
+`04_hc_vs_pd.ipynb` asked a sharper question: is PD's FM100 profile just
+HC's, shifted by a constant? Every magnitude feature differs from HC
+(TES p=0.017, PES red-green p=0.009, PES blue-yellow p=0.018, both VKS
+radii p<0.02) but `VKS_Angle` doesn't (p=0.84) -- PD's error is bigger, not
+differently-directed, the same magnitude-not-direction pattern
+`02_group_comparisons.ipynb` already found. There genuinely is a real,
+non-zero offset (c=1.04, 95% CI [0.32, 1.81], p=0.003) -- but it only
+explains about half of PD's shape (R²=0.50), so "PD = HC + a number" is a
+real partial description, not the whole story.
+
+Two more checks (M3) sharpened both of those: correcting the per-feature
+comparisons for testing 6 features at once (Holm) is a real, not just
+procedural, tightening -- **CTR vs PD loses every feature** (smallest
+corrected p is 0.052) and protan vs deutan still has nothing, though HC vs
+protan and HC vs deutan both keep 11 of their significant rows. And the
+offset finding survives a direct stress test: only one CTR subject
+(MET020, already flagged elsewhere in this section) is an outlier on most
+of the 6 features, and dropping them barely moves the offset (1.04 to
+1.11) or its R² (0.50 to 0.47) -- "PD = HC + a number" isn't riding on one
+unusual control.
+
 ## 2. Behavioral: what your own clicks say
 
 `beh/notebooks/01_explore.ipynb`, `02_shape_features.ipynb`, `03_centroids.ipynb`
@@ -107,6 +138,26 @@ separate, tight clusters, while deutan turns out to be the least
 internally-consistent group we have (its subject-to-subject spread is
 roughly double every other group's, on both the raw clicks and the shape
 features).
+
+Three more notebooks tested how far that story holds up.
+`04_reliability.ipynb` asked whether it's stable session-to-session (HC and
+PD only -- CVD is excluded, most protan/deutan subjects have just one
+session). For HC, mostly not: of centroid location and the three M2 shape
+features, only `centroid_green` clears significance (ICC=0.60, p=0.0013);
+`orientation_deg`, `along_var`, `perp_var`, and `centroid_red` don't. That
+doesn't undercut M2's headline result -- that used clicks pooled across a
+subject's sessions, a more forgiving question -- but it's a real caveat
+before trusting any single session's numbers on their own. `05_hc_vs_pd.ipynb`
+reran the M1 comparison on HC vs PD specifically (Hotelling p=0.0001,
+matching M1; all three shape features individually significant too) and
+found something new: PD subjects are significantly less consistent within
+a single sitting (Mann-Whitney p=0.023, ~70% more within-session click
+scatter than HC, 552 vs 320) -- a specific, confirmed answer to whether
+PD's motor symptoms show up as noisier clicking. `06_outlier_rejection.ipynb`
+added ellipse-based outlier detection (per-subject and per-group) and ran
+it everywhere: flagged fractions come back similar and unremarkable across
+every group (10.5%-15.5% of clicks) -- an honest "nothing alarming" result,
+not grounds for adding automatic filtering to the pipeline.
 
 ## 3. EEG (SSVEP grid): the harder, indirect measure
 
@@ -147,6 +198,30 @@ response surface. HC's dip (paler patch) sits centrally, around red ~2100
 grid's edge instead of sitting in the middle -- the visual version of
 "CVD subjects' troughs tend to lie beyond the sampled red range."*
 
+Four more notebooks (`13_hc_vs_pd.ipynb` through `16_grid_shape_features.ipynb`)
+pushed further into the CVD subtype question, and one of them revises the
+picture above. `13_hc_vs_pd.ipynb` found HC vs PD not significant on
+`ramp_slope_red` (p=0.89) -- consistent with PD being underpowered
+everywhere else in this project. `14_hc_vs_subtypes.ipynb` ran the same
+measure three ways: HC vs protan (p=0.0019) and HC vs deutan (p=0.048) are
+both significant, protan vs deutan still isn't (p=0.69) -- matching M6's
+number above almost exactly. Then `15_permutation_stability.ipynb` reran
+protan vs deutan 200 times at independent seeds, using the cluster-based
+permutation test instead of a whole-grid scalar summary, and found **a
+corrected-significant cluster in 173-196 of 200 seeds (86.5%-98%)** -- a
+stable, seed-robust effect, not a fluke. This genuinely revises the "none
+individually reaches significance" bullet above: protan and deutan *do*
+differ significantly in the EEG data, just in a spatially localized region
+(the low-red/high-green corner of the grid, protan higher than deutan
+there) that a whole-grid summary like `ramp_slope_red` or PCA's PC1
+averages away. It's currently the single most solid subtype signal
+anywhere in the SSVEP data, and worth chasing further -- does M8's protan
+trough-region residual sit in the same corner? -- before the next round of
+analysis design. Last, `16_grid_shape_features.ipynb` tried a new rotated
+(tilted) dip model on top of this, but too few subjects have a valid fit to
+run the protan/deutan comparison yet (25% and 43% valid fits, vs 90-100%
+for HC/PD) -- the model itself works, the data just isn't there yet.
+
 ## 4. Does the EEG test actually agree with what people click?
 
 `ssvepBeh/notebooks/01_explore.ipynb`, then `02_reliability.ipynb`
@@ -165,7 +240,18 @@ the "metamer" concept the whole stimulator is built around shows up in the
 brain data even for people with no diagnosed deficiency, which is exactly
 the kind of subtle trend you were hoping to find a hint of. We double-checked
 this holds up across repeat EEG sessions too, and it does -- the numbers
-from session 1 and session 2 are nearly identical.
+from session 1 and session 2 are nearly identical. `04_permutation_stability.ipynb`
+pushed that stability check further, rerunning the same test 200 times at
+independent seeds for HC, PD, protan, and deutan: **every group stays
+significant at every single seed** -- robust to the permutation RNG, not
+just to which session you check. `03_clicks_on_grid.ipynb` is the picture
+that makes this finding visible at a glance -- the EEG grid as a heatmap
+with each participant's actual clicks scattered on top, per subject and
+per group, with and without `beh/`'s M4 outlier filter. And
+`05_toroidal_shift_explained.ipynb` is a from-scratch, step-by-step
+walkthrough of the toroidal-shift null model itself (a synthetic 5x5 grid,
+then a real subject) for anyone who wants to understand the test, not just
+its output.
 
 ![CVD group: EEG response grid next to behavioral click density, same axes](figures/findings_beh_eeg_overlap_cvd.png)
 
@@ -295,15 +381,25 @@ that's a hint to chase with more data, not a settled finding yet).
 
 - **Solid and ready to lean on:** behavioral group separation (especially
   click-line orientation for protan/deutan), the CVD-vs-control EEG signal,
-  the spatial agreement between clicks and EEG response, and (new) FM100's
-  own severity features being reliably measured.
+  the spatial agreement between clicks and EEG response (now also confirmed
+  robust to the permutation seed, not just the session), and FM100's own
+  severity features being reliably measured -- plus a real (if partial)
+  constant offset between HC's and PD's FM100 profile shape.
+- **A revised subtype picture, mid-project:** protan and deutan's EEG
+  responses *do* differ significantly after all -- just in one specific,
+  localized region of the grid rather than in any whole-grid summary
+  number, and it only turned up once we tested seed-stability directly with
+  a cluster-based test instead of a scalar one. It's currently the most
+  solid subtype signal in the SSVEP data, and a reminder that "not
+  significant" can depend on which test you reach for first.
 - **Promising but not yet proven:** whether EEG severity tracks behavioral
   severity person-by-person; whether FM100's or the EEG's severity spectrum
   is a true within-group continuum or mostly a between-group difference we
   already knew about; the EEG version of the type/axis result, currently
   only significant within deutan at n=7; the new protan-specific
-  clicks-vs-EEG lead from M3 (n=8). All real, honestly-documented open
-  questions, not dead ends.
+  clicks-vs-EEG lead from M3 (n=8); the new rotated-dip shape-feature
+  comparison for protan/deutan, blocked on too few valid fits (25%/43%
+  valid). All real, honestly-documented open questions, not dead ends.
 - **The most convincing result across the whole project:** the three-way
   finding -- FM100, your clicks, and the EEG all agree as a group on which
   way a deficiency points, a pattern robust enough to survive one of the
@@ -313,8 +409,9 @@ that's a hint to chase with more data, not a settled finding yet).
 - **Not yet started:** everything in this line of work now comes back to
   sample size -- more CVD/protan/deutan participants would let us actually
   test whether the severity spectrum and the three-way agreement hold up
-  *within* a single diagnostic group, which is the one question none of
-  M1/M2/M3 could fully answer at today's numbers.
+  *within* a single diagnostic group, and would unblock the rotated-fit
+  shape comparison above -- the one recurring bottleneck across every
+  piece of this project.
 
 ## Come play
 
@@ -330,6 +427,12 @@ mood:
   profiles and see whose shape changes the most.
 - In `ssveps/notebooks/12_pca.ipynb`, the PCA loadings are sitting right
   there as heatmaps -- worth a look even without changing anything.
+- In `ssveps/notebooks/15_permutation_stability.ipynb`, look at where the
+  corrected-significant cluster actually sits across a few of the 200
+  seeds -- it's the most reproducible protan/deutan signal in the project
+  so far, and hasn't been chased any further than "it's there."
+- In `beh/notebooks/06_outlier_rejection.ipynb`, try `n_std=1.5` or `2.5`
+  instead of the default 2.0 and see how much the flagged fractions move.
 - Anywhere you see a `seed=` parameter, changing it re-shuffles the
   permutation test's random draws -- a good way to build intuition for how
   stable a given p-value really is.

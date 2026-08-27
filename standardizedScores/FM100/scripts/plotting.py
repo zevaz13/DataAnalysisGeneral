@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from comparisons import FEATURES, group_pooled_scores, tukey_outlier_mask
 from loader import subjects_in_group
 from scores import N_CAPS, err_vals
 
@@ -104,6 +105,29 @@ def _apply_cap_labels(ax: plt.Axes, *, step: int = RADIAL_TICK_STEP) -> None:
     ax.set_xticklabels([str(_cap_label(i)) for i in indices])
 
 
+CAP_WHEEL_CMAP = plt.cm.hsv  # cyclic colormap sampled at each cap's own angular position -- the caps sit on one continuous hue circle, so angular position doubles as an approximate hue (fm100radialTemplate.png)
+
+
+def _draw_cap_wheel(ax: plt.Axes) -> None:
+    """Draws a ring of N_CAPS colored dots just outside the plotted data
+    (fm100radialTemplate.png's outer ring), one per cap position, colored
+    by CAP_WHEEL_CMAP. Every cap gets a printed number (_cap_label
+    convention) -- unlike _apply_cap_labels' every-Nth-cap default, the
+    ring itself is the legend, so there's no crowding tradeoff to make.
+    Rescales ax's r-limit (from its current auto-scaled data max) to leave
+    room for the ring and its labels, and blanks the radial tick labels,
+    which would otherwise collide with the ring."""
+    r_data_max = ax.get_ylim()[1]
+    r_ring = r_data_max * 1.15
+    r_label = r_data_max * 1.3
+    colors = CAP_WHEEL_CMAP(np.linspace(0, 1, N_CAPS, endpoint=False))
+    ax.scatter(CAP_ANGLES, np.full(N_CAPS, r_ring), c=colors, s=40, zorder=5, edgecolor="white", linewidth=0.5)
+    for i, angle in enumerate(CAP_ANGLES):
+        ax.text(angle, r_label, str(_cap_label(i)), fontsize=5, ha="center", va="center")
+    ax.set_ylim(0, r_label * 1.15)
+    ax.set_yticklabels([])
+
+
 def plot_subject_fm100(
     df: pd.DataFrame,
     sub_id: str,
@@ -112,6 +136,7 @@ def plot_subject_fm100(
     sessions: list[int] | None = None,
     window: int = 1,
     label_mode: str = "angle",
+    show_cap_wheel: bool = False,
     ax: plt.Axes | None = None,
 ) -> plt.Axes:
     """One participant's error profile, one line per session overlaid
@@ -119,7 +144,11 @@ def plot_subject_fm100(
     plot_subject_sessions). kind='linear' or 'radial'. window is the
     circular moving-average size (1 = no smoothing). label_mode (radial
     only): 'angle' (default, matplotlib's own angle-in-degrees ticks) or
-    'cap' (the FM100 test's own cap-number convention, _apply_cap_labels)."""
+    'cap' (the FM100 test's own cap-number convention, _apply_cap_labels).
+    show_cap_wheel (radial only): draws fm100radialTemplate.png's colored
+    cap-number ring around the data (_draw_cap_wheel) instead of tick
+    labels -- takes priority over label_mode when both are set, since the
+    ring already carries every cap's number."""
     if kind not in ("linear", "radial"):
         raise ValueError(f"kind must be 'linear' or 'radial', got {kind!r}")
     if label_mode not in ("angle", "cap"):
@@ -139,7 +168,9 @@ def plot_subject_fm100(
         _style_linear_axes(ax, title=sub_id)
     else:
         ax.set_title(sub_id)
-        if label_mode == "cap":
+        if show_cap_wheel:
+            _draw_cap_wheel(ax)
+        elif label_mode == "cap":
             _apply_cap_labels(ax)
     ax.legend(fontsize=8)
     return ax
@@ -152,6 +183,7 @@ def plot_group_fm100(
     kind: str = "linear",
     window: int = 1,
     label_mode: str = "angle",
+    show_cap_wheel: bool = False,
     ax: plt.Axes | None = None,
 ) -> plt.Axes:
     """One line + shaded +-1 SD band per category -- categories is the same
@@ -160,9 +192,11 @@ def plot_group_fm100(
     averaged first, see group_profiles) to that category's mean/SD, so the
     ±1 SD band reflects subject-to-subject spread, not session count.
     kind='linear' or 'radial'. label_mode (radial only): 'angle' (default)
-    or 'cap' (see plot_subject_fm100). Up to len(FULL_PALETTE) (8)
-    categories -- a line chart, so the dataviz skill's adjacent-pair color
-    rule applies, not the stricter all-pairs scatter cap."""
+    or 'cap' (see plot_subject_fm100). show_cap_wheel (radial only): see
+    plot_subject_fm100 -- takes priority over label_mode when both are set.
+    Up to len(FULL_PALETTE) (8) categories -- a line chart, so the dataviz
+    skill's adjacent-pair color rule applies, not the stricter all-pairs
+    scatter cap."""
     if kind not in ("linear", "radial"):
         raise ValueError(f"kind must be 'linear' or 'radial', got {kind!r}")
     if label_mode not in ("angle", "cap"):
@@ -186,7 +220,9 @@ def plot_group_fm100(
         _style_linear_axes(ax, title="Group FM100 error profile (mean ± 1 SD)")
     else:
         ax.set_title("Group FM100 error profile (mean ± 1 SD)")
-        if label_mode == "cap":
+        if show_cap_wheel:
+            _draw_cap_wheel(ax)
+        elif label_mode == "cap":
             _apply_cap_labels(ax)
     ax.legend(fontsize=8)
     return ax
@@ -231,6 +267,99 @@ def plot_subjects_fm100(
     return ax
 
 
+BOX_JITTER_WIDTH = 0.15
+OUTLIER_LABEL_COLOR = "black"
+INLIER_LABEL_COLOR = "#555555"
+
+
+def plot_feature_boxplot(
+    df: pd.DataFrame,
+    feature: str,
+    categories: list[dict],
+    *,
+    seed: int | None = 0,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """One box (Tukey 1.5xIQR whiskers, showfliers=False -- outliers are
+    drawn as labeled scatter points instead of matplotlib's own flier
+    markers) per category, with every subject's own value scattered on top
+    (small horizontal jitter) and labeled with their id minus the 'MET'
+    prefix (M3: spot which CTR/PD participants land inside another group's
+    range, and which subjects look unlike their own group). Points
+    comparisons.tukey_outlier_mask flags against their own category (the
+    same 1.5xIQR rule the box itself is drawn with) get a black edge and a
+    bold label instead of the default white edge/plain gray label -- an
+    outlier stands out without a second legend. Label text always uses a
+    fixed color (OUTLIER_LABEL_COLOR/INLIER_LABEL_COLOR), never the
+    category color, so identity stays on the point, not the text (dataviz
+    skill: text wears text tokens). Up to len(FULL_PALETTE) (8) categories,
+    same {"label", "group"/"subgroup", or "sub_ids"} shape used throughout
+    this project."""
+    if len(categories) > len(FULL_PALETTE):
+        raise ValueError(f"plot_feature_boxplot supports at most {len(FULL_PALETTE)} categories, got {len(categories)}")
+    if ax is None:
+        _, ax = plt.subplots()
+    rng = np.random.default_rng(seed)
+
+    tick_labels = []
+    for i, (cat, color) in enumerate(zip(categories, FULL_PALETTE), start=1):
+        pooled = group_pooled_scores(df, group=cat.get("group"), subgroup=cat.get("subgroup"))
+        values = pooled[feature].to_numpy()
+        outlier = tukey_outlier_mask(values)
+        ax.boxplot(
+            values,
+            positions=[i],
+            widths=0.5,
+            showfliers=False,
+            boxprops={"color": color, "linewidth": 1.5},
+            medianprops={"color": color, "linewidth": 1.5},
+            whiskerprops={"color": color, "linewidth": 1.5},
+            capprops={"color": color, "linewidth": 1.5},
+        )
+        x = i + rng.uniform(-BOX_JITTER_WIDTH, BOX_JITTER_WIDTH, len(values))
+        ax.scatter(x[~outlier], values[~outlier], color=color, alpha=0.8, edgecolor="white", linewidth=0.5, s=30, zorder=3)
+        ax.scatter(x[outlier], values[outlier], color=color, alpha=0.9, edgecolor="black", linewidth=1.0, s=40, zorder=4)
+        for xi, yi, sub_id, is_out in zip(x, values, pooled["sub_id"], outlier):
+            ax.annotate(
+                sub_id.removeprefix("MET"),
+                (xi, yi),
+                fontsize=6,
+                xytext=(4, 2),
+                textcoords="offset points",
+                color=OUTLIER_LABEL_COLOR if is_out else INLIER_LABEL_COLOR,
+                fontweight="bold" if is_out else "normal",
+            )
+        tick_labels.append(f"{cat['label']} (n={len(values)})")
+
+    ax.set_xticks(range(1, len(categories) + 1))
+    ax.set_xticklabels(tick_labels)
+    ax.set_ylabel(feature)
+    ax.set_title(feature)
+    return ax
+
+
+def plot_feature_boxplots_grid(
+    df: pd.DataFrame,
+    categories: list[dict],
+    *,
+    features: list[str] = FEATURES,
+    seed: int | None = 0,
+) -> plt.Figure:
+    """plot_feature_boxplot, one panel per feature in a 2-column grid (M3:
+    "flag outlier participants for each group", all six features at a
+    glance)."""
+    ncols = 2
+    nrows = -(-len(features) // ncols)  # ceil
+    fig, axes = plt.subplots(nrows, ncols, figsize=(11, 4 * nrows))
+    axes = np.atleast_1d(axes).flatten()
+    for ax, feature in zip(axes, features):
+        plot_feature_boxplot(df, feature, categories, seed=seed, ax=ax)
+    for ax in axes[len(features) :]:
+        ax.axis("off")
+    fig.tight_layout()
+    return fig
+
+
 def plot_group_vs_subjects_fm100(
     df: pd.DataFrame,
     categories: list[dict],
@@ -239,6 +368,7 @@ def plot_group_vs_subjects_fm100(
     kind: str = "linear",
     window: int = 1,
     label_mode: str = "angle",
+    show_cap_wheel: bool = False,
 ) -> plt.Axes:
     """plot_group_fm100's category bands (solid line + shaded SD, same
     FULL_PALETTE colors) with individual participants' session-1 profiles
@@ -246,11 +376,17 @@ def plot_group_vs_subjects_fm100(
     a group to one or more participants"). Dashed vs. solid is the
     distinguishing encoding, not color alone, since a subject's color can
     coincide with an unrelated category's -- consistent with the dataviz
-    skill's "identity is never color-alone" rule. Up to len(SUBJECT_COLORS)
-    (4) subjects; categories follows plot_group_fm100's own cap."""
+    skill's "identity is never color-alone" rule. show_cap_wheel (radial
+    only): see plot_subject_fm100 -- drawn last, after the subject overlays
+    below, not inside the plot_group_fm100 call: _draw_cap_wheel calls
+    ax.set_ylim, which disables further autoscaling, so drawing it before
+    the overlays would silently clip any subject line reaching past the
+    group bands' own range. Up to len(SUBJECT_COLORS) (4) subjects;
+    categories follows plot_group_fm100's own cap."""
     if len(sub_ids) > len(SUBJECT_COLORS):
         raise ValueError(f"plot_group_vs_subjects_fm100 supports at most {len(SUBJECT_COLORS)} subjects, got {len(sub_ids)}")
-    ax = plot_group_fm100(df, categories, kind=kind, window=window, label_mode=label_mode)
+    inner_label_mode = "angle" if show_cap_wheel else label_mode  # avoid an _apply_cap_labels call show_cap_wheel is about to override anyway
+    ax = plot_group_fm100(df, categories, kind=kind, window=window, label_mode=inner_label_mode, show_cap_wheel=False)
 
     x = CAP_ANGLES if kind == "radial" else CAP_POSITIONS
     for sub_id, color in zip(sub_ids, SUBJECT_COLORS):
@@ -258,5 +394,7 @@ def plot_group_vs_subjects_fm100(
         plot_x, plot_y = _radial_xy(x, profile, kind=kind)
         ax.plot(plot_x, plot_y, color=color, linewidth=2, linestyle="--", label=f"{sub_id} (individual)")
 
+    if kind == "radial" and show_cap_wheel:
+        _draw_cap_wheel(ax)
     ax.legend(fontsize=8)
     return ax
