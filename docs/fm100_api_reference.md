@@ -99,6 +99,14 @@ all-pairs one.
   and individually numbered via `_cap_label`. No every-Nth-cap tradeoff to
   make, unlike `label_mode='cap'` -- takes priority over `label_mode` when
   both are set. No-op for `kind='linear'`.
+- **`_new_axes(kind) -> Axes`** (M3) The one shared creation point for
+  every polar/linear axes these three functions build when the caller
+  doesn't pass their own `ax=`. `kind='radial'` axes get
+  `theta_direction=-1` -- `fm100radialTemplate.png`'s cap numbers grow
+  clockwise, opposite matplotlib's polar default -- set once here so it
+  applies uniformly to whatever gets plotted on the axes afterward (the
+  error-profile line, `_draw_cap_wheel`'s ring, `_apply_cap_labels`'
+  ticks), rather than needing to be replicated per artist.
 - **`group_profiles(df, *, group=None, subgroup=None, sub_ids=None, window=1) -> ndarray`**
   (renamed from `_group_profiles`, now public) One smoothed error profile
   per subject matching the filter (`(n_subjects, 85)`), each subject's own

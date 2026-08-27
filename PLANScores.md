@@ -99,11 +99,24 @@ headline findings.
   the p-value (0.0030 -> 0.0010), and doesn't improve R² (0.505 -> 0.465,
   if anything slightly worse). **"PD looks like HC + a constant" isn't an
   artifact of one unusual control** -- a genuine group-level pattern.
-- [ ] Notice how in the template the cap numbers grow clockwise. Our plots should mimic this convention. 
+- [x] **Clockwise cap numbers.** `fm100radialTemplate.png`'s cap numbers
+  grow clockwise; matplotlib's own polar default is counterclockwise.
+  Fixed at the one shared axes-creation point (`plotting._new_axes`,
+  factored out of `plot_subject_fm100`/`plot_group_fm100`/
+  `plot_subjects_fm100`'s three near-identical creation sites),
+  `ax.set_theta_direction(-1)` for `kind='radial'`. Applied once at the
+  axes level rather than to the wheel/tick-label code individually, since
+  the data line, cap-wheel ring, and any angle ticks are all plotted via
+  the same `CAP_ANGLES` array on the same axes -- flipping any one of
+  them independently would desync it from the others; the axes-level flip
+  keeps everything mutually consistent for free. `01_explore.ipynb`,
+  `03_flagged_subjects.ipynb`, `04_hc_vs_pd.ipynb` (every notebook with a
+  radial figure) re-executed to pick up the corrected direction.
+
 `standardizedScores/FM100/tests/test_fm100.py` covers every new function
 (correction math, Tukey masking, the wheel's point count and tick
-overrides, the boxplot grid's panel count) -- 51/51 passing, 222/222 across
-the whole repo.
+overrides, the boxplot grid's panel count, the clockwise direction) --
+54/54 passing, 225/225 across the whole repo.
 
 ## Next milestones
 

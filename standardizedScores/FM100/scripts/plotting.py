@@ -76,6 +76,22 @@ def _radial_xy(x: np.ndarray, y: np.ndarray, *, kind: str) -> tuple[np.ndarray, 
     return np.append(x, x[0] + 2 * np.pi), np.append(y, y[0])
 
 
+def _new_axes(kind: str) -> plt.Axes:
+    """New linear or polar axes, as plot_subject_fm100/plot_group_fm100/
+    plot_subjects_fm100 each need when the caller doesn't pass their own
+    ax= (none currently do for kind='radial' -- dashboard/pages/1_FM100.py
+    always lets these functions create their own). Polar axes get
+    theta_direction=-1 (M3): fm100radialTemplate.png's cap numbers grow
+    clockwise, but matplotlib's own polar default is counterclockwise --
+    set once here so every radial plot (data line, cap-wheel ring, angle
+    ticks) shares the same rotational handedness, in the one place all
+    three creation sites share."""
+    _, ax = plt.subplots(subplot_kw={"projection": "polar"} if kind == "radial" else None)
+    if kind == "radial":
+        ax.set_theta_direction(-1)
+    return ax
+
+
 def _style_linear_axes(ax: plt.Axes, *, title: str | None = None) -> None:
     ax.set_xlim(1, N_CAPS)
     ax.set_xlabel("cap position")
@@ -156,7 +172,7 @@ def plot_subject_fm100(
     if sessions is None:
         sessions = sorted(df.loc[df["sub_id"] == sub_id, "session"].unique())
     if ax is None:
-        _, ax = plt.subplots(subplot_kw={"projection": "polar"} if kind == "radial" else None)
+        ax = _new_axes(kind)
 
     x = CAP_ANGLES if kind == "radial" else CAP_POSITIONS
     for session, color in zip(sessions, SESSION_COLORS):
@@ -204,7 +220,7 @@ def plot_group_fm100(
     if len(categories) > len(FULL_PALETTE):
         raise ValueError(f"plot_group_fm100 supports at most {len(FULL_PALETTE)} categories, got {len(categories)}")
     if ax is None:
-        _, ax = plt.subplots(subplot_kw={"projection": "polar"} if kind == "radial" else None)
+        ax = _new_axes(kind)
 
     x = CAP_ANGLES if kind == "radial" else CAP_POSITIONS
     for cat, color in zip(categories, FULL_PALETTE):
@@ -249,7 +265,7 @@ def plot_subjects_fm100(
     if label_mode not in ("angle", "cap"):
         raise ValueError(f"label_mode must be 'angle' or 'cap', got {label_mode!r}")
     if ax is None:
-        _, ax = plt.subplots(subplot_kw={"projection": "polar"} if kind == "radial" else None)
+        ax = _new_axes(kind)
 
     x = CAP_ANGLES if kind == "radial" else CAP_POSITIONS
     for sub_id, color in zip(sub_ids, SUBJECT_COLORS):

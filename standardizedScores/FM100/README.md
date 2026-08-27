@@ -56,7 +56,12 @@ in `load_fm100_raw` drops it.
   colored, individually-numbered ring of all 85 caps instead -- always
   drawn *last*, after every other series on the axes, since it fixes the
   r-axis limit (disabling further autoscaling), which would silently clip
-  a later-added line reaching past it. `group_profiles` (renamed from
+  a later-added line reaching past it. Every radial axes (whichever
+  function creates it) grows cap numbers clockwise (M3, matching
+  `fm100radialTemplate.png` -- matplotlib's own polar default is
+  counterclockwise), set once in the shared `_new_axes` helper so the data
+  line, wheel ring, and any tick labels stay mutually consistent.
+  `group_profiles` (renamed from
   `_group_profiles`, now public) is reused directly by `comparisons.py`'s
   `estimate_offset`. `plot_feature_boxplot`/`plot_feature_boxplots_grid`
   (M3) -- one Tukey-whiskered box per group/subgroup with every subject's

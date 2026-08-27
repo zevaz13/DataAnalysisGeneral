@@ -180,6 +180,19 @@ def test_plot_subject_fm100_radial_uses_a_polar_axes(df):
     assert ax.name == "polar"
 
 
+def test_new_axes_radial_grows_clockwise():
+    """PLANScores.md M3: fm100radialTemplate.png's cap numbers grow
+    clockwise, not matplotlib's polar default (counterclockwise) --
+    set once in _new_axes so the data line, cap-wheel ring, and any angle
+    ticks (all plotted via the same CAP_ANGLES array on the same axes)
+    stay mutually consistent for free."""
+    assert plotting._new_axes("radial").get_theta_direction() == -1
+
+
+def test_new_axes_linear_is_not_polar():
+    assert plotting._new_axes("linear").name != "polar"
+
+
 def test_plot_subject_fm100_radial_closes_the_circle(df):
     """CAP_ANGLES uses endpoint=False -- without closing, cap 85 and cap 1
     wouldn't connect, leaving a visible gap at the seam."""
