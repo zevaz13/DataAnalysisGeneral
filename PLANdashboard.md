@@ -224,6 +224,87 @@ per-project-own-constants convention (no shared palette module).
       `diverging_blue_red`, db -> `viridis`, raw -> `sequential_blue`, each
       matching its own non-click counterpart exactly.
 
+## M3. Sidebar-per-mode UI, bigger plot area, FM100 tick convention -- done
+
+**Key technical decision:** `st.tabs()` cannot report which tab is
+currently selected to the running script, so sidebar widgets placed
+inside a `with tab:` block rendered simultaneously regardless of the
+visible tab (true on all three pages before this milestone) -- not
+actually "in sync." Replaced `st.tabs()` with `st.segmented_control()`
+(available in this Streamlit version, 1.62.0) as the one mode-switcher on
+all three pages: same pill-button look, but its return value drives both
+the main content and genuinely conditional sidebar widgets (`if mode ==
+"X": ... else: ...`, each branch its own `key=`s). Verified via
+`streamlit.testing.v1.AppTest`: ran every page in both modes, asserted
+each mode's sidebar text does *not* contain the other mode's
+headers/widgets (e.g. SSVEP Individuals has no "Significance test"
+header and no `Permutations` slider; Behavioral Shape features has no
+"Participants (up to 8)"; FM100 Participant has no "Compare to
+participant").
+
+New colors (FM100 red/`#4682b4`, Behavioral `#5f8158`, SSVEP `#f1c232`)
+are UI accents only -- `_pagesetup.py`'s new `sidebar_mode_header(text,
+color)` tints that mode's sidebar section header via inline HTML
+(`st.sidebar.header` itself takes no color param); the existing validated
+multi-subject/category palettes (SUBJECT_COLORS, FULL_PALETTE,
+SCATTER4_COLORS) are untouched. FM100's "red" side reuses this repo's own
+established red swatch, `#e34948` (FULL_PALETTE's last slot, `hue/`'s
+`HueR` mnemonic), since only participant's hex was given explicitly.
+
+### General
+- [x] `layout="wide"` added to every page's `st.set_page_config`
+      (Home + all three pages).
+
+### FM100
+- [x] Linear plots get the same `85,1,2,...,84` cap-numbering convention
+      radial already used -- new `_apply_cap_labels_linear` in
+      `standardizedScores/FM100/scripts/plotting.py`, wired into
+      `_style_linear_axes` unconditionally (all four plot functions share
+      it), every 5th cap (17 labels, matches `RADIAL_TICK_STEP`). Test
+      added.
+- [x] Group mode (red `#e34948` header): Groups (≤4) -> plot style ->
+      smoothing window -> compare-to-participant(s). Participant mode
+      (`#4682b4` header): Participants -> plot style -> smoothing window.
+
+### Behavioral
+- [x] Raw clicks mode (unaccented): groups (≤4) + participants, cap
+      raised 4->8. `plot_subjects_grid` gained a `max_cols` param
+      (default `MAX_PANEL_COLS`, unchanged for every other caller);
+      dashboard passes `max_cols=4` for an even 4+4 layout at 8 subjects
+      (you confirmed this over the default 5+3). Test added.
+- [x] Overlaid view stays capped at `len(SCATTER4_COLORS)` (4) -- the
+      color-identity constraint doesn't change, so past 4 selections the
+      page silently renders side-by-side instead with an explanatory
+      caption, rather than raising the cap unsafely. Implementation note:
+      first built by changing the `st.radio`'s `options=` list shape
+      between reruns (present/absent the "Overlaid" choice) -- that resets
+      an unkeyed radio's identity and silently drops the user's own
+      selection every time the subject count crosses 4. Fixed to a stable
+      2-option radio with its own `key`, gating behavior instead of the
+      widget's shape.
+- [x] Shape features mode (`#5f8158` header): groups (≤4), x/y feature
+      pickers, single-subject selector -- raw-clicks-only widgets fully
+      hidden, not just visually behind a tab.
+
+### SSVEP
+- [x] Groups mode (unaccented): groups (≤4) -> normalization ->
+      behavioral overlay -> significance test (unchanged from M2).
+- [x] Individuals mode (`#f1c232` header): individual participants ->
+      normalization -> behavioral overlay. No significance-test section
+      at all (no slider, no pairwise table) -- confirmed absent via
+      AppTest, not just visually hidden.
+
+Verified via `streamlit.testing.v1.AppTest` (every page run through both
+modes with real selections -- categories, subjects, plot-style toggles,
+show-clicks checkboxes -- asserting no exception and the correct
+widgets/headers present or absent per mode) plus an HTTP-level check of a
+scratch instance (`--server.port` other than the one already running the
+user's own live session) confirming all four routes 200 with no
+tracebacks. Full test suite 253/253 (2 new: FM100 linear tick labels,
+`plot_subjects_grid`'s `max_cols`).
+
+## M2 verification note (unchanged, for reference)
+
 Verified via direct call-sequence smoke tests (every FM100 plotting
 function x both `kind`s; every SSVEP normalization x click-overlay on/off,
 reading back the rendered colormap) and an HTTP-level check of the running

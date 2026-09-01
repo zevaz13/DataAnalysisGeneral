@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import matplotlib.pyplot as plt
 import streamlit as st
 
-from _pagesetup import CATEGORY_OPTIONS, use_scripts
+from _pagesetup import CATEGORY_OPTIONS, sidebar_mode_header, use_scripts
 
 mods = use_scripts("ssveps/scripts", "analysis", "permutation", "plotting")
 analysis, permutation, plotting = mods["analysis"], mods["permutation"], mods["plotting"]
@@ -16,9 +16,10 @@ beh_loader = beh_mods["loader"]
 ssvepbeh_mods = use_scripts("ssvepBeh/scripts", "plotting")
 overlap_plotting = ssvepbeh_mods["plotting"]
 
-st.set_page_config(page_title="SSVEP", page_icon="🎨")
+st.set_page_config(page_title="SSVEP", page_icon="🎨", layout="wide")
 st.title("SSVEP (EEG grid response)")
 
+INDIVIDUALS_COLOR = "#f1c232"
 SESSION = 1  # every subject has a session-1 row (matches every ssveps/ notebook)
 OVERLAY_SIZE, OVERLAY_ALPHA = 8, 0.4  # smaller/more transparent than the notebooks' defaults -- less screen space here
 
@@ -55,16 +56,6 @@ def load_behavioral():
 runmap_df, baselines_df, metadata_df = load_data()
 beh_df = load_behavioral()
 
-st.sidebar.header("Normalization")
-normalize_label = st.sidebar.radio("Normalization", list(NORMALIZE_OPTIONS), index=0)
-normalize = NORMALIZE_OPTIONS[normalize_label]
-cmap = CMAP_OVERRIDES[normalize_label]
-
-st.sidebar.header("Behavioral overlay")
-show_clicks = st.sidebar.checkbox("Show behavioral clicks on the maps")
-
-st.sidebar.header("Significance test")
-n_perm = st.sidebar.slider("Permutations", 100, 1000, 300, step=100)
 
 @st.cache_data(show_spinner="Running permutation test...")
 def run_permutation(_runmap_df, _baselines_df, _metadata_df, session, group1, subgroup1, group2, subgroup2, normalize, n_perm):
@@ -75,14 +66,25 @@ def run_permutation(_runmap_df, _baselines_df, _metadata_df, session, group1, su
     )
 
 
-groups_tab, individuals_tab = st.tabs(["Groups", "Individuals"])
+mode = st.segmented_control("View", ["Groups", "Individuals"], default="Groups")
 
-with groups_tab:
-    st.sidebar.header("Groups (up to 4)")
+if mode == "Groups":
+    sidebar_mode_header("Groups (up to 4)")
     selected_labels = st.sidebar.multiselect(
         "Categories", list(CATEGORY_OPTIONS), default=["HC", "protan", "deutan"], max_selections=4
     )
     categories = [{"label": label, **CATEGORY_OPTIONS[label]} for label in selected_labels]
+
+    st.sidebar.header("Normalization")
+    normalize_label = st.sidebar.radio("Normalization", list(NORMALIZE_OPTIONS), index=0, key="groups_normalize")
+    normalize = NORMALIZE_OPTIONS[normalize_label]
+    cmap = CMAP_OVERRIDES[normalize_label]
+
+    st.sidebar.header("Behavioral overlay")
+    show_clicks = st.sidebar.checkbox("Show behavioral clicks on the maps", key="groups_show_clicks")
+
+    st.sidebar.header("Significance test")
+    n_perm = st.sidebar.slider("Permutations", 100, 1000, 300, step=100)
 
     st.subheader("Mean response grids")
     if categories:
@@ -136,11 +138,20 @@ with groups_tab:
     else:
         st.info("Select at least two categories to compare.")
 
-with individuals_tab:
-    st.sidebar.header("Individual participants")
+else:
+    sidebar_mode_header("Individual participants", INDIVIDUALS_COLOR)
     subjects = st.sidebar.multiselect(
         "Subjects (any group)", sorted(metadata_df.loc[metadata_df["session"] == SESSION, "sub_id"].unique()), key="individuals_tab_subjects"
     )
+
+    st.sidebar.header("Normalization")
+    normalize_label = st.sidebar.radio("Normalization", list(NORMALIZE_OPTIONS), index=0, key="individuals_normalize")
+    normalize = NORMALIZE_OPTIONS[normalize_label]
+    cmap = CMAP_OVERRIDES[normalize_label]
+
+    st.sidebar.header("Behavioral overlay")
+    show_clicks = st.sidebar.checkbox("Show behavioral clicks on the maps", key="individuals_show_clicks")
+
     st.subheader("Selected participants, side by side")
     if subjects:
         if show_clicks:

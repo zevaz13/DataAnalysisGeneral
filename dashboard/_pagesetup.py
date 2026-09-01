@@ -14,6 +14,8 @@ instead of being read from disk.
 import sys
 from pathlib import Path
 
+import streamlit as st
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Shared across every page's category selector -- all three projects use the
@@ -26,6 +28,18 @@ CATEGORY_OPTIONS = {
     "protan": {"subgroup": "protan"},
     "deutan": {"subgroup": "deutan"},
 }
+
+
+def sidebar_mode_header(text: str, color: str | None = None) -> None:
+    """A sidebar section header for the active st.segmented_control mode
+    (dashboard M3) -- plain st.sidebar.header when color is None (the
+    "keep the current scheme" side of a page's mode split), or tinted
+    `color` as that mode's UI accent (st.sidebar.header itself takes no
+    color parameter, hence the raw markdown)."""
+    if color is None:
+        st.sidebar.header(text)
+    else:
+        st.sidebar.markdown(f"<h3 style='color:{color}'>{text}</h3>", unsafe_allow_html=True)
 
 
 def use_scripts(rel_path: str, *names: str) -> dict:

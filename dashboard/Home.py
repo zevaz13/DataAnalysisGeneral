@@ -6,7 +6,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 GITHUB_REPO = "https://github.com/zevaz13/DataAnalysisGeneral"
 GITHUB_BLOB = f"{GITHUB_REPO}/blob/main"
 
-st.set_page_config(page_title="CVD study dashboard", page_icon="🎨")
+st.set_page_config(page_title="CVD study dashboard", page_icon="🎨", layout="wide")
 
 st.title("CVD study dashboard")
 st.write("Interactive views over the color-vision-deficiency analysis in this repo.")

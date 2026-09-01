@@ -175,16 +175,19 @@ def plot_subjects_grid(
     xlim: tuple[float, float] = XLIM,
     ylim: tuple[float, float] = YLIM,
     show_fit: bool = False,
+    max_cols: int = MAX_PANEL_COLS,
 ) -> plt.Figure:
     """One panel per subject (that subject's whole point cloud, every
-    session pooled), wrapped to at most MAX_PANEL_COLS per row -- "all on a
+    session pooled), wrapped to at most max_cols per row -- "all on a
     grid (max 5 participants per row)" (PLANbeh.md M1). Pass sub_ids for an
     arbitrary hand-picked set of subjects side by side instead of a
     group/subgroup filter. show_fit=True overlays each subject's fitted PCA
-    line (see plot_subject_cloud)."""
+    line (see plot_subject_cloud). max_cols defaults to MAX_PANEL_COLS (5);
+    dashboard/pages/2_Behavioral.py's raw-clicks tab passes max_cols=4 for
+    an even 4+4 layout at its 8-subject cap (dashboard M3)."""
     if sub_ids is None:
         sub_ids = subjects_in_group(df, group=group, subgroup=subgroup)
-    fig, axes = _multi_panel_figure(len(sub_ids))
+    fig, axes = _multi_panel_figure(len(sub_ids), max_cols=max_cols)
     for ax, sub_id in zip(axes, sub_ids):
         plot_subject_cloud(df, sub_id, xlim=xlim, ylim=ylim, show_fit=show_fit, ax=ax)
     subtitle = ", ".join(filter(None, [group, subgroup])) or f"{len(sub_ids)} subjects"

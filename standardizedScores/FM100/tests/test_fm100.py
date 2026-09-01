@@ -265,6 +265,15 @@ def test_apply_cap_labels_uses_the_requested_step(df):
     assert labels[0] == "85"
 
 
+def test_apply_cap_labels_linear_uses_the_requested_step(df):
+    """dashboard M3: linear plots get the same 85,1,2,...,84 cap-numbering
+    convention radial already uses, unconditionally."""
+    ax = plotting.plot_subject_fm100(df, "MET001", kind="linear", sessions=[1])
+    labels = [t.get_text() for t in ax.get_xticklabels()]
+    assert labels == [str(plotting._cap_label(i)) for i in range(0, 85, plotting.RADIAL_TICK_STEP)]
+    assert labels[0] == "85"
+
+
 def test_plot_subject_fm100_rejects_unknown_label_mode(df):
     with pytest.raises(ValueError):
         plotting.plot_subject_fm100(df, "MET001", label_mode="nonsense")

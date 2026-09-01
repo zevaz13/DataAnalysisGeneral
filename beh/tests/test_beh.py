@@ -214,6 +214,15 @@ def test_plot_subjects_grid_wraps_at_max_panel_cols(df):
     assert len(visible) == len(sub_ids)
 
 
+def test_plot_subjects_grid_respects_max_cols_override(df):
+    """dashboard M3: the raw-clicks tab wants an even 4+4 layout at 8
+    subjects, not MAX_PANEL_COLS' default 5+3."""
+    sub_ids = loader.subjects_in_group(df, subgroup="protan")  # 8 subjects
+    fig = plotting.plot_subjects_grid(df, sub_ids=sub_ids, max_cols=4)
+    rows, cols = fig.axes[0].get_subplotspec().get_gridspec().get_geometry()
+    assert (rows, cols) == (2, 4)
+
+
 def test_plot_groups_side_by_side_one_panel_per_category(df):
     categories = [{"label": "HC", "group": "CTR"}, {"label": "PD", "group": "PD"}]
     fig = plotting.plot_groups_side_by_side(df, categories)

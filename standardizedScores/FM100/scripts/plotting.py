@@ -92,14 +92,6 @@ def _new_axes(kind: str) -> plt.Axes:
     return ax
 
 
-def _style_linear_axes(ax: plt.Axes, *, title: str | None = None) -> None:
-    ax.set_xlim(1, N_CAPS)
-    ax.set_xlabel("cap position")
-    ax.set_ylabel("error")
-    if title:
-        ax.set_title(title)
-
-
 RADIAL_TICK_STEP = 5  # every 5th cap gets a printed label on the radial diagram, in 'cap' label_mode
 
 
@@ -119,6 +111,25 @@ def _apply_cap_labels(ax: plt.Axes, *, step: int = RADIAL_TICK_STEP) -> None:
     indices = np.arange(0, N_CAPS, step)
     ax.set_xticks(CAP_ANGLES[indices])
     ax.set_xticklabels([str(_cap_label(i)) for i in indices])
+
+
+def _apply_cap_labels_linear(ax: plt.Axes, *, step: int = RADIAL_TICK_STEP) -> None:
+    """Linear counterpart to _apply_cap_labels (dashboard M3): the same
+    85,1,2,...,84 cap-numbering convention radial already uses, one
+    printed label every `step` cap positions, so linear and radial always
+    read the same way at a glance."""
+    indices = np.arange(0, N_CAPS, step)
+    ax.set_xticks(CAP_POSITIONS[indices])
+    ax.set_xticklabels([str(_cap_label(i)) for i in indices])
+
+
+def _style_linear_axes(ax: plt.Axes, *, title: str | None = None) -> None:
+    ax.set_xlim(1, N_CAPS)
+    ax.set_xlabel("cap position")
+    ax.set_ylabel("error")
+    _apply_cap_labels_linear(ax)
+    if title:
+        ax.set_title(title)
 
 
 RADIAL_HOLE_FRAC = 0.27  # tuned against MET038_filt.png/MET038RadNoFilt.png (PLANScores.md M3) -- re-tuned after fixing _finish_radial_axes's hole-before-wheel ordering bug, which had made 0.4 render correctly only when show_cap_wheel=True (see plotting.py's own test/docstring history for the ordering fix)
