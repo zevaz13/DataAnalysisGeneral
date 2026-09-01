@@ -16,10 +16,13 @@ sys.path.insert(0, str(SCRIPTS))
 # those test modules first, sys.modules would hold their versions. Drop them
 # so the imports below re-resolve against SCRIPTS (see beh/README.md's Tests
 # section for the same issue there).
-for _name in ("loader", "plotting"):
+for _name in ("loader", "plotting", "aggregate"):
     sys.modules.pop(_name, None)
 
+import aggregate  # noqa: E402
 import loader  # noqa: E402
+import pandas as pd  # noqa: E402
+import plotting  # noqa: E402
 
 EXPECTED_COLUMNS = {"Stim", "HueR", "HueG", "HueB", "HueC", "HueCT", "HueLux", "Yellow", "Red", "Green", "Trig", "sample_idx", "is_baseline", "grid_index", "baseline_id"}
 GRID_RED_VALUES = {0, 355, 711, 1066, 1422, 1777, 2133, 2488, 2844, 3200}
@@ -108,3 +111,90 @@ def test_most_conditions_have_six_baseline_blocks_rgy_1_has_one(flashdiff_df):
 def test_sample_idx_restarts_at_zero_per_stim_block(filters_df):
     one_block = filters_df[(filters_df["flicker"] == "solid") & (filters_df["filter"] == "NF") & (filters_df["Stim"] == 1)]
     assert one_block["sample_idx"].tolist() == list(range(len(one_block)))
+
+
+def _synthetic_block(stim: int, n: int, start: float) -> pd.DataFrame:
+    """One Stim block, HueR ramping start..start+n-1, for isolated trim-math tests."""
+    return pd.DataFrame(
+        {
+            "Stim": stim,
+            "sample_idx": range(n),
+            "HueR": [start + i for i in range(n)],
+            "is_baseline": False,
+            "grid_index": stim,
+            "baseline_id": pd.NA,
+            "Red": 100,
+            "Green": 200,
+            "Yellow": 0,
+        }
+    )
+
+
+def test_aggregate_trials_trims_both_edges_before_averaging():
+    df = pd.concat([_synthetic_block(1, 10, start=0), _synthetic_block(2, 10, start=100)], ignore_index=True)
+    agg = aggregate.aggregate_trials(df, group_cols=["Stim"], channels=["HueR"], trim=2)
+    # block 1: values 0..9, trim 2 off each end -> 2..7, mean 4.5
+    assert agg.set_index("Stim").loc[1, "HueR"] == pytest.approx(4.5)
+    # block 2: values 100..109, trim 2 off each end -> 102..107, mean 104.5
+    assert agg.set_index("Stim").loc[2, "HueR"] == pytest.approx(104.5)
+
+
+def test_aggregate_trials_one_row_per_block_grid_and_baseline(filters_df):
+    agg = aggregate.aggregate_trials(filters_df, group_cols=["flicker", "filter", "Stim"])
+    assert len(agg) == filters_df.groupby(["flicker", "filter", "Stim"]).ngroups
+    assert set(agg["is_baseline"].unique()) == {True, False}
+    assert (agg.loc[~agg["is_baseline"], "grid_index"] >= 1).all()
+
+
+def test_aggregate_trials_keeps_constant_columns(flashdiff_df):
+    agg = aggregate.aggregate_trials(flashdiff_df, group_cols=["condition", "Stim"])
+    for col in ("is_baseline", "grid_index", "baseline_id", "Red", "Green", "Yellow"):
+        assert col in agg.columns
+
+
+def test_additivity_prediction_matches_hand_computed_formula():
+    agg = pd.DataFrame(
+        {
+            "condition": ["R", "R", "G", "G", "Y", "Y", "NN", "NN", "RGY", "RGY"],
+            "grid_index": [1, 2, 1, 2, 1, 2, 1, 2, 1, 2],
+            "is_baseline": False,
+            "HueR": [10, 20, 1, 2, 3, 4, 5, 6, 21, 32],
+        }
+    )
+    out = aggregate.additivity_prediction(agg, components=["R", "G", "Y"], target="RGY", offset_multiplier=2, channels=["HueR"])
+    row1 = out.set_index("grid_index").loc[1]
+    # predicted = R + G + Y - 2*NN = 10 + 1 + 3 - 2*5 = 4
+    assert row1["HueR_predicted"] == pytest.approx(4)
+    assert row1["HueR_actual"] == pytest.approx(21)
+
+
+def test_plot_channel_trials_one_panel_per_group(filters_df):
+    agg = aggregate.aggregate_trials(filters_df, group_cols=["flicker", "filter", "Stim"])
+    agg["condition"] = agg["flicker"] + "_" + agg["filter"]
+    fig = plotting.plot_channel_trials(agg, group_col="condition")
+    assert len(fig.axes) == agg["condition"].nunique()
+
+
+def test_plot_channel_trials_show_baseline_adds_markers(filters_df):
+    agg = aggregate.aggregate_trials(filters_df, group_cols=["flicker", "filter", "Stim"])
+    agg["condition"] = agg["flicker"] + "_" + agg["filter"]
+    fig = plotting.plot_channel_trials(agg, group_col="condition", groups=["solid_NF"], show_baseline=True)
+    ax = fig.axes[0]
+    assert len(ax.collections) == len(plotting.CORE_CHANNELS)  # one scatter series per channel
+
+
+def test_plot_prediction_trials_one_panel_per_channel_actual_and_predicted_lines():
+    pred = pd.DataFrame(
+        {
+            "grid_index": [1, 2, 3],
+            "HueR_actual": [10, 20, 30],
+            "HueR_predicted": [9, 21, 29],
+            "HueG_actual": [1, 2, 3],
+            "HueG_predicted": [1, 2, 3],
+        }
+    )
+    fig = plotting.plot_prediction_trials(pred, channels=["HueR", "HueG"])
+    assert len(fig.axes) == 2
+    for ax in fig.axes:
+        assert len(ax.lines) == 2  # actual + predicted
+        assert "black" in {line.get_color() for line in ax.lines}

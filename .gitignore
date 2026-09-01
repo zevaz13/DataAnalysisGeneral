@@ -12,3 +12,6 @@ __pycache__/
 
 # SSVEP template code (local, not tracked)
 /ssveps/templateCode
+
+# Annotation folder (local, not tracked)
+/annotation

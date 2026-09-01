@@ -57,3 +57,13 @@ To test this, I ran the grid experiment multiple times with the hue sensor, chan
 
 Before comparing these results to the SSVEP data, I want to relate the `Flash_*` conditions to one another. My working hypothesis is that the responses combine additively and linearly across conditions. This is that GY is a combination of G, Y and maybe NN. And that RGY is the combination of R, G, Y, NN,  or RG, Y, NN, or RY, G, NN.
 
+## Result: additivity confirmed, with an offset that scales
+
+Tested against real data (`PLANhue.md` M2-M3, `notebooks/03_additivity_explore.ipynb`) -- the hypothesis holds, once the `NN` (nothing-flashes) term is corrected for properly.
+
+`NN` is a shared environmental offset present in every condition's reading, not something to add once per combination. Summing *k* single/multi-channel conditions and subtracting `NN` only once (`RGY ≈ R + G + Y − NN`) under-corrects badly -- mean |residual| 340-460 raw counts, every channel offset uniformly high. Subtracting `NN` once per *extra* condition summed (`RGY ≈ R + G + Y − 2·NN`, i.e. `(k−1)·NN`) fixes it: residuals drop to 9-18 counts, matching the two-component combinations (`GY ≈ G + Y − NN`, `RY ≈ R + Y − NN`, `RG ≈ R + G − NN`, each 4-29 counts) and the sensor's own run-to-run repeatability floor (`02_flashdiff_explore.ipynb`'s two `RGY` runs: mean |diff| 3-19 counts, worst cell ~120). The three named `RGY` decompositions (`R+G+Y`, `RG+Y`, `RY+G`, each with the correct `(k−1)·NN` correction) land in the same band as each other -- no one grouping is privileged, consistent with genuine additivity.
+
+Plotting predicted vs. actual against trial order, not just as an aggregate residual (`plotting.plot_prediction_trials`), confirms this holds across the *entire* grid sequence -- every peak and trough of the (non-raster-ordered, see `README.md`) grid is reproduced, not just the average. What daylight remains is small, consistent jitter, proportionally largest on whichever channel is least-flashed in a given condition (e.g. `HueR` under `GY`) -- noise, not a shape mismatch.
+
+Not yet checked: whether `(k−1)·NN` holds for `filters/`'s conditions too, or whether a per-channel offset multiplier fits better than one shared value.
+

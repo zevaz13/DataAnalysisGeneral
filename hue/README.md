@@ -28,7 +28,11 @@ Derived:
 - `sample_idx` -- row order within one `(file, Stim)` block (no timestamp
   column exists; sampling is ~110ms).
 - `is_baseline` -- whether this `Stim` is a baseline/reference reading
-  rather than a grid cell.
+  rather than a grid cell. The baseline procedure shows a non-blinking
+  yellow light for 3 seconds at 2400 D/A units -- not recorded in
+  `Yellow`/`Red`/`Green` (those all log `0` on baseline rows) due to a
+  data-logger bug, not a mystery signal; `HueR`'s strong, consistent
+  ~3290 reading during baseline is that yellow light.
 - `grid_index` -- `1`-`100` for grid rows (`NA` for baseline rows). Maps
   1:1 to a `(Red, Green)` pair, confirmed identical across every
   condition and both `filters/` and `flashDiff/`
@@ -74,21 +78,25 @@ the raw numbers. Any per-trial aggregation needs to trim both edges of a
   above for what each does to the raw Stim-numbering quirk).
 - `scripts/plotting.py` -- `plot_channel_overview` (every raw sample of a
   condition's core channels, in recording order -- see one trial's
-  onset-transient-then-plateau shape by slicing to one `Stim` first) and
+  onset-transient-then-plateau shape by slicing to one `Stim` first),
+  `plot_channel_trials` (aggregated channel value vs. `grid_index`, one
+  panel per group -- the linear counterpart to the grid heatmap), and
   `plot_channel_grid` (a 10x10 heatmap per channel, red on x/green on y
   matching `ssveps/`'s own grid-heatmap convention, from an
-  already-aggregated one-row-per-grid-cell table). The per-trial
-  aggregation itself is prototyped per notebook for now, not fixed in
-  `scripts/` yet -- see `../PLANhue.md`.
+  already-aggregated one-row-per-grid-cell table).
+- `scripts/aggregate.py` -- `aggregate_trials` (mean per channel per
+  `Stim` block, first/last `TRIM=5` samples dropped from each end to
+  clear the neighbor-contaminated edges above) and
+  `additivity_prediction` (per-grid-cell predicted-vs-actual comparison
+  for the Goal-3 additivity hypothesis in
+  `hue_sensor_experiment_notes.md`, `NN` as the environmental offset --
+  see `../PLANhue.md` M2 for the confirmed `offset_multiplier`).
 
 ## Tests
 
 `uv run pytest hue/tests -q`. Same module-naming-collision defense as
 every other project's test file (see `beh/README.md`'s Tests section) --
-`loader`/`plotting` dropped from `sys.modules` before import. Loader only
-for now (shape, columns, the Stim-scheme normalization, the grid_index-to-
-(Red,Green) consistency check) -- no aggregation tests yet, since that
-method isn't decided.
+`loader`/`plotting`/`aggregate` dropped from `sys.modules` before import.
 
 ## Notebooks
 
@@ -102,3 +110,7 @@ Each opens with `sys.path.append('../scripts')`, so run them with
   overview and single-trial zoom across all nine `Flash_*` conditions;
   aggregation and grid heatmap per condition, to compare which channel(s)
   respond where.
+- `03_additivity_explore.ipynb` -- M2: `aggregate_trials`/
+  `additivity_prediction` against the working additivity hypothesis --
+  which offset correction and which `RGY` decomposition actually fit; see
+  `../PLANhue.md` M2 for the finding.

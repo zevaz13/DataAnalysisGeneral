@@ -69,17 +69,89 @@ flashDiff/ conditions as tested. Next: promote to `scripts/aggregate.py`
 with tests, once cross-checked on a condition with smaller neighbor-to-
 neighbor jumps too (per `01_filters_explore.ipynb`'s note).
 
-## Open questions from M1, worth resolving before the next milestone
+## Open questions from M1 -- resolved
 
-- What does the baseline procedure actually flash? Its `Red`/`Green`/
-  `Yellow` columns all log `0`, but `HueR` reads a strong, consistent
-  ~3290 during it -- best asked directly rather than reverse-engineered.
-- Does `EDGE_TRIM=3` hold up on grid cells with smaller neighbor-to-
-  neighbor jumps than the `55`/`56` example, or does it need to scale with
-  how different the neighboring `Stim`'s value is?
+- What does the baseline procedure actually flash? **Resolved:** a
+  non-blinking yellow light for 3 seconds at 2400 D/A units. Not
+  recording it as a column was a bug in the data logger, not a
+  mysterious signal -- no code change needed, `is_baseline`/`baseline_id`
+  already isolate those rows.
+- Does `EDGE_TRIM=3` hold up on grid cells with smaller neighbor jumps,
+  or does it need to scale? **Resolved:** no adaptive scaling -- just a
+  bigger fixed trim, 5 samples off each end (grid *and* baseline blocks
+  alike), confirmed sufficient without needing a real elapsed-time
+  window.
+
+## M2. Windowed aggregation, linear view, additivity exploration -- done
+
+- [x] `hue/scripts/aggregate.py` (new module): `TRIM = 5`;
+  `aggregate_trials(df, *, group_cols, channels=CORE_CHANNELS,
+  trim=TRIM)` -- one row per `Stim` block (grid or baseline), first/last
+  `trim` samples dropped before averaging, replacing the notebook-only
+  `EDGE_TRIM=3` prototype from M1. `additivity_prediction(agg, *,
+  components, target, offset_multiplier, offset_condition="NN", ...)` --
+  per-grid-cell predicted-vs-actual table for the Goal-3 additivity
+  hypothesis, joining on `grid_index`; `offset_multiplier` is a free
+  parameter (not derived from `len(components)`), since which correction
+  actually fits was exactly the open question.
+- [x] `hue/scripts/plotting.py`: `plot_channel_trials` -- one panel per
+  group, aggregated channel value vs. `grid_index` (trial order), the
+  linear counterpart to `plot_channel_grid`'s heatmap; `show_baseline`
+  (default `False`) adds baseline blocks as markers past the grid trials.
+- [x] `hue/tests/test_hue.py`: trim-math correctness (synthetic block),
+  one-row-per-block/baseline-included, constant-column carry-through,
+  `additivity_prediction`'s formula, `plot_channel_trials` panel/marker
+  counts. 250/250 full-suite pass, no regressions.
+- [x] **`03_additivity_explore.ipynb`** -- tested the working hypothesis
+  from `hue_sensor_experiment_notes.md` against real data. **Finding:** a
+  flat `-NN` correction badly fails for the three-way sum
+  (`RGY ~ R+G+Y`, mean |residual| 340-460 counts, all three channels
+  uniformly offset above the diagonal) -- but `-2*NN` (the `(k-1)`
+  scaling floated during brainstorming: each extra summed condition adds
+  one more copy of the shared NN offset) drops that to 9-18 counts,
+  in line with the two-component models (`GY~G+Y`, `RY~R+Y`, `RG~R+G`,
+  each 4-29 counts) and with `02_flashdiff_explore.ipynb`'s own
+  RGY-repeatability floor (mean |diff| 3-19, worst cell ~120). The three
+  named `RGY` decompositions (`R+G+Y`, `RG+Y`, `RY+G`, each with its
+  correct multiplier) land in the same 9-30 count band as each other --
+  real support for additivity-with-offset-scaling, not just one
+  privileged grouping. **Real finding, not just plumbing.**
+
+## M3. Per-trial agreement plots -- done
+
+- [x] `hue/scripts/plotting.py`: `plot_prediction_trials(pred, *,
+  channels=CORE_CHANNELS, title="")` -- one panel per channel, from
+  `aggregate.additivity_prediction`'s output, actual condition in that
+  channel's own color (solid) vs. predicted/combined value in black
+  (dashed), both against `grid_index` (trial order). Test added
+  (panel count, actual+predicted line count, predicted line is black).
+- [x] `03_additivity_explore.ipynb`: the four primary combinations
+  (`GY~G+Y`, `RY~R+Y`, `RG~R+G`, each `offset_multiplier=1`; `RGY~R+G+Y`,
+  `offset_multiplier=2`) plotted this way. **Finding:** predicted tracks
+  actual's sawtooth shape trial-by-trial across the *entire* grid
+  sequence, not just on average -- every peak/trough in the non-raster
+  grid ordering is reproduced. Remaining daylight is small, consistent
+  jitter (a few percent of each channel's own range), proportionally
+  largest on the least-flashed channel per condition (e.g. `GY`'s `HueR`,
+  small dynamic range ~1800-2020) -- matching the residual-size pattern
+  from M2, not a new problem. Strongest evidence yet for additivity:
+  agreement holds across the whole grid, not just in aggregate.
+- [x] Remaining candidates plotted the same way: the flat `-NN`
+  `RGY~R+G+Y` failure case, and the two alternate decompositions
+  (`RG+Y`, `RY+G`). **Finding:** the flat-offset failure is a clean
+  constant shift, not a shape mismatch -- predicted reproduces actual's
+  exact sawtooth the whole way across the grid, just uniformly high by
+  one under-subtracted `NN` copy, confirming it's an offset error, not a
+  broken model. Both alternate decompositions track actual as tightly as
+  `R+G+Y, x2` across the full sequence -- no decomposition is
+  distinguishable from the others by eye, reinforcing that this is
+  genuine additivity rather than one privileged grouping.
 
 ## Next milestones
 
-To be defined together, once the above is resolved -- likely the goal-3
-additivity hypothesis in `hue_sensor_experiment_notes.md`, or relating
-aggregated grid values to `ssveps/`'s own response grids.
+To be defined together -- likely candidates: does the same `(k-1)*NN`
+rule hold for `filters/`'s conditions too (not just `flashDiff/`); does a
+per-channel `offset_multiplier` fit better than one shared value; the
+alternate `RGY` decompositions (`RG+Y`, `RY+G`) plotted the same way; or
+relating the now-validated additive model to `ssveps/`'s own response
+grids per Goal 3.
