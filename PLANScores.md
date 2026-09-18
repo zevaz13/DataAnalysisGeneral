@@ -165,4 +165,51 @@ across the whole repo.
 
 ## Next milestones
 
+- [x] **Whole-group individual comparison + per-subject session grid.**
+  `plotting.plot_subjects_fm100`/`plot_group_vs_subjects_fm100` cap out at
+  `SUBJECT_COLORS` (4) -- too few for a group like PD (n=6 unique
+  subjects). Two new functions instead: `plot_group_all_subjects_fm100`
+  (every matching subject as one muted `INDIVIDUAL_LINE_COLOR` line, own
+  sessions averaged first via `group_profiles`, plus the group mean in
+  `MEAN_LINE_COLOR` on top -- avoids inventing per-subject hues past
+  `FULL_PALETTE`'s 8 validated slots) and `plot_subjects_grid_fm100` (one
+  `plot_subject_fm100` panel per subject in a grid, all of that subject's
+  own sessions overlaid via `SESSION_COLORS` -- the small-group,
+  session-level view). Grid linear panels re-space x-tick labels to a
+  coarser step (`RADIAL_TICK_STEP * 3`) than the single-plot default --
+  the full 17-label spacing collides once panels are grid-narrow. Both
+  support `kind='linear'`/`'radial'`, `window`, `label_mode`,
+  `show_cap_wheel`/`show_cap_colors`, same as the rest of the module.
+  6 new tests, 69/69 passing in this module.
+- [x] **Shared y/r-limits across grid panels; cap-wheel colors on the
+  pooled-comparison radial plot.** `plot_subjects_grid_fm100` autoscaled
+  each panel to its own subject, so a "bigger" loop could just mean a
+  smaller local scale -- new `ylim` param on `plot_subject_fm100` (applied
+  before the radial hole/wheel, so those also key off the shared range)
+  and `share_ylim=True` (default) on the grid function, which takes the
+  max error across every session of every requested subject plus 5%
+  headroom and applies it to every panel; `share_ylim=False` restores the
+  old per-panel autoscale. `plot_group_all_subjects_fm100`'s radial now
+  uses `show_cap_wheel=True` in the notebook (matches the established
+  single-subject convention, e.g. `01_explore.ipynb`'s MET038 plot) rather
+  than `label_mode='cap'`. New tests: `ylim` overrides autoscale, grid
+  panels share one `ylim` by default, `share_ylim=False` reverts to
+  per-panel scales. `standardizedScores/FM100/notebooks/06_pd_group_and_sessions.ipynb`
+  regenerated with these settings. 72/72 passing in this module.
+- [x] **Per-subject color on `plot_group_all_subjects_fm100`; cap colors on
+  linear plots.** Reverted the muted-gray-individuals design: each subject
+  now gets its own `FULL_PALETTE` color (fixed order by sorted sub_id,
+  same adjacent-pair-validated list `plot_group_fm100` already uses) and
+  its own legend entry, capped at `len(FULL_PALETTE)` (8) subjects --
+  raises `ValueError` beyond that (use `plot_subjects_grid_fm100` for
+  bigger groups instead of cycling hues). `INDIVIDUAL_LINE_COLOR` removed;
+  `MEAN_LINE_COLOR` changed from `FULL_PALETTE[0]` (which collided with
+  the first subject's own color once subjects got hues) to a dedicated
+  near-black `"#1a1a1a"`, kept visually heavier (`linewidth=2.75` vs.
+  `1.25`) than any individual line. `06_pd_group_and_sessions.ipynb`'s
+  linear cells now also pass `show_cap_colors=True`. New tests: individual
+  lines get `FULL_PALETTE`'s colors in sub_id order with matching legend
+  labels, the mean's color never matches a subject's, and the
+  more-than-8-subjects case raises. 73/73 passing in this module.
+
 To be defined together.

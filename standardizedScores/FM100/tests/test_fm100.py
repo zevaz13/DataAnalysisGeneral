@@ -53,7 +53,7 @@ def template():
 
 def test_load_fm100_raw_has_expected_shape_and_columns(df):
     assert list(df.columns) == ["sub_id", "session", "group", "subgroup", "sex", "date", "caps"]
-    assert len(df) == 69  # 70 raw rows minus the byte-identical duplicate MET000 row
+    assert len(df) == 70  # 71 raw rows minus the byte-identical duplicate MET000 row
 
 
 def test_duplicate_first_row_is_dropped(df):
@@ -65,6 +65,15 @@ def test_duplicate_first_row_is_dropped(df):
 def test_session_suffix_parsing(df):
     met000_sessions = sorted(df.loc[df["sub_id"] == "MET000", "session"])
     assert met000_sessions == [1, 2, 3]  # MET000, MET000b, MET000c
+
+
+def test_no_duplicate_subject_session_pairs(df):
+    """Every (sub_id, session) pair must be unique -- a raw Reference field
+    missing its b/c suffix (as MET039's repeat visit briefly was) collapses
+    two real sessions into one, which _subject_profile then rejects."""
+    counts = df.groupby(["sub_id", "session"]).size()
+    dupes = counts[counts > 1]
+    assert dupes.empty, f"duplicate (sub_id, session) rows: {dupes.to_dict()}"
 
 
 def test_caps_are_a_permutation_of_1_to_85(df):
@@ -335,6 +344,62 @@ def test_plot_group_vs_subjects_fm100_rejects_more_subjects_than_subject_colors(
     sub_ids = sorted(df["sub_id"].unique())[: len(plotting.SUBJECT_COLORS) + 1]
     with pytest.raises(ValueError):
         plotting.plot_group_vs_subjects_fm100(df, categories, sub_ids)
+
+
+def test_plot_group_all_subjects_fm100_draws_one_line_per_subject_plus_mean(df):
+    ax = plotting.plot_group_all_subjects_fm100(df, group="PD")
+    n_subjects = len(plotting.group_profiles(df, group="PD"))
+    assert len(ax.lines) == n_subjects + 1
+    assert ax.lines[-1].get_color() == plotting.MEAN_LINE_COLOR
+
+
+def test_plot_group_all_subjects_fm100_individual_lines_get_distinct_palette_colors(df):
+    sub_ids = loader.subjects_in_group(df, group="PD")
+    ax = plotting.plot_group_all_subjects_fm100(df, group="PD")
+    individual_lines = ax.lines[:-1]
+    assert [line.get_color() for line in individual_lines] == plotting.FULL_PALETTE[: len(sub_ids)]
+    assert [line.get_label() for line in individual_lines] == sub_ids
+    assert ax.lines[-1].get_color() != individual_lines[0].get_color()
+
+
+def test_plot_group_all_subjects_fm100_rejects_more_subjects_than_full_palette(df):
+    sub_ids = sorted(df["sub_id"].unique())[: len(plotting.FULL_PALETTE) + 1]
+    with pytest.raises(ValueError):
+        plotting.plot_group_all_subjects_fm100(df, sub_ids=sub_ids)
+
+
+def test_plot_subjects_grid_fm100_has_one_panel_per_subject(df):
+    sub_ids = sorted(df["sub_id"].unique())[:5]
+    fig = plotting.plot_subjects_grid_fm100(df, sub_ids, ncols=4)
+    on_axes = [ax for ax in fig.axes if ax.get_title()]
+    assert len(on_axes) == len(sub_ids)
+    assert {ax.get_title() for ax in on_axes} == set(sub_ids)
+
+
+def test_plot_subjects_grid_fm100_radial_sets_clockwise_direction(df):
+    sub_ids = sorted(df["sub_id"].unique())[:2]
+    fig = plotting.plot_subjects_grid_fm100(df, sub_ids, kind="radial")
+    assert all(ax.get_theta_direction() == -1 for ax in fig.axes[: len(sub_ids)])
+
+
+def test_plot_subjects_grid_fm100_shares_ylim_by_default(df):
+    sub_ids = loader.subjects_in_group(df, group="PD")
+    fig = plotting.plot_subjects_grid_fm100(df, sub_ids)
+    on_axes = [ax for ax in fig.axes if ax.get_title()]
+    assert len({ax.get_ylim() for ax in on_axes}) == 1
+
+
+def test_plot_subjects_grid_fm100_share_ylim_false_autoscales_per_panel(df):
+    sub_ids = loader.subjects_in_group(df, group="PD")
+    fig = plotting.plot_subjects_grid_fm100(df, sub_ids, share_ylim=False)
+    on_axes = [ax for ax in fig.axes if ax.get_title()]
+    assert len({ax.get_ylim() for ax in on_axes}) > 1
+
+
+def test_plot_subject_fm100_ylim_overrides_autoscale(df):
+    sub_id = sorted(df["sub_id"].unique())[0]
+    ax = plotting.plot_subject_fm100(df, sub_id, ylim=(0, 100))
+    assert ax.get_ylim() == (0, 100)
 
 
 # --- comparisons.py: group comparisons and offset (M2) -----------------------

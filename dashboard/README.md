@@ -4,7 +4,8 @@ Interactive Streamlit views over the FM100/behavioral/SSVEP analysis code.
 This is a thin presentation layer -- every page imports and calls the same
 `loader`/`plotting`/`comparisons` functions the corresponding notebook
 uses, so nothing here recomputes or duplicates analysis logic. See
-`PLANdashboard.md` for the design decisions and `docs/findings.md` for the
+`PLANdashboard.md` for the design decisions, `docs/dashboard_summary.md`
+for what exists and the milestone history, and `docs/findings.md` for the
 results narrative.
 
 ## Run it

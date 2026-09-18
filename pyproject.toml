@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "bci2kreader>=0.32.dev0",
     "hotelling>=0.5.0",
     "ipykernel<7",
     "matplotlib>=3.11.1",

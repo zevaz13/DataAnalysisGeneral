@@ -79,7 +79,7 @@ save(fig, "shared_stimulus_hc_overlap.png")
 # 2. FM100 radial error profile, one subject -- docs/experiment_summary.md.
 #    Port of standardizedScores/FM100/notebooks/01_explore.ipynb.
 # ---------------------------------------------------------------------------
-use(FM100_SCRIPTS, "loader", "plotting")
+use(FM100_SCRIPTS, "loader", "plotting", "comparisons")
 import loader as fm100_loader
 import plotting as fm100_plotting
 
@@ -104,7 +104,7 @@ save(ax, "findings_fm100_groups_radial.png")
 # 4. Behavioral shape feature space, protan vs. deutan -- findings section 2.
 #    Port of beh/notebooks/02_shape_features.ipynb.
 # ---------------------------------------------------------------------------
-use(BEH_SCRIPTS, "loader", "plotting")
+use(BEH_SCRIPTS, "loader", "plotting", "comparisons")
 import loader as beh_loader2
 import plotting as beh_plotting
 
@@ -160,7 +160,7 @@ use(FM100BEH_SCRIPTS, "plotting")
 import plotting as fm100beh_plotting
 import type_axis
 
-use(BEH_SCRIPTS, "loader", "features")
+use(BEH_SCRIPTS, "loader", "features", "comparisons")
 import features as beh_features3
 import loader as beh_loader3
 

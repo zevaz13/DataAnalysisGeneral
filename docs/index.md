@@ -116,7 +116,8 @@ Docs: `README.md`, `../PLANssvep_bh_fm100.md`,
 ### `dashboard/` -- Streamlit presentation layer
 No analysis logic of its own -- every page imports the corresponding
 project's `loader`/`plotting`/`comparisons` functions directly. Docs:
-`README.md`, `../PLANdashboard.md`. Run: `uv run streamlit run dashboard/Home.py`.
+`README.md`, `../PLANdashboard.md`, `docs/dashboard_summary.md`. Run:
+`uv run streamlit run dashboard/Home.py`.
 
 | File | What it does |
 |---|---|

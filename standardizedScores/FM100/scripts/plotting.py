@@ -28,6 +28,7 @@ SUBJECT_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#4a3aa7"]  # validated all-p
 # dataviz skill's normal-vision floor against #eb6834 (deltaE 13.7 < 15)
 FULL_PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]  # adjacent-pair validated, for lines
 BAND_ALPHA = 0.2
+MEAN_LINE_COLOR = "#1a1a1a"  # near-black, deliberately outside FULL_PALETTE so the group mean never collides with a subject's own color
 
 CAP_POSITIONS = np.arange(1, N_CAPS + 1)
 CAP_ANGLES = np.linspace(0, 2 * np.pi, N_CAPS, endpoint=False)
@@ -233,6 +234,7 @@ def plot_subject_fm100(
     label_mode: str = "angle",
     show_cap_wheel: bool = False,
     show_cap_colors: bool = False,
+    ylim: tuple[float, float] | None = None,
     ax: plt.Axes | None = None,
 ) -> plt.Axes:
     """One participant's error profile, one line per session overlaid
@@ -246,7 +248,12 @@ def plot_subject_fm100(
     labels -- takes priority over label_mode when both are set, since the
     ring already carries every cap's number. show_cap_colors (linear
     only): the same per-cap colors as a row of dots along the x-axis
-    (MET038Lin_filt.png, _draw_cap_colors_linear)."""
+    (MET038Lin_filt.png, _draw_cap_colors_linear). ylim: fixes the
+    y-range (r-range for radial) instead of autoscaling to this subject's
+    own data -- set before show_cap_wheel/show_cap_colors/the radial hole
+    are applied, so they scale off the shared range too. None (default)
+    autoscales per subject, as before; plot_subjects_grid_fm100 passes a
+    shared value so a grid's panels read on the same scale."""
     if kind not in ("linear", "radial"):
         raise ValueError(f"kind must be 'linear' or 'radial', got {kind!r}")
     if label_mode not in ("angle", "cap"):
@@ -261,6 +268,8 @@ def plot_subject_fm100(
         profile = _subject_profile(df, sub_id, session, window=window)
         plot_x, plot_y = _radial_xy(x, profile, kind=kind)
         ax.plot(plot_x, plot_y, color=color, linewidth=2, label=f"session {session}")
+    if ylim is not None:
+        ax.set_ylim(*ylim)
 
     if kind == "linear":
         _style_linear_axes(ax, title=sub_id)
@@ -516,3 +525,122 @@ def plot_group_vs_subjects_fm100(
         _draw_cap_colors_linear(ax)
     ax.legend(fontsize=8)
     return ax
+
+
+def plot_group_all_subjects_fm100(
+    df: pd.DataFrame,
+    *,
+    group: str | None = None,
+    subgroup: str | None = None,
+    sub_ids: list[str] | None = None,
+    kind: str = "linear",
+    window: int = 1,
+    label_mode: str = "angle",
+    show_cap_wheel: bool = False,
+    show_cap_colors: bool = False,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """Every participant matching the filter as its own thin, colored line
+    (own sessions averaged first, via group_profiles), plus the group mean
+    on top in a heavier line -- the individual-level counterpart to
+    plot_group_fm100's mean +-1 SD band. Each subject gets its own
+    FULL_PALETTE color, fixed order by sorted sub_id (same adjacent-pair
+    validated 8-color list plot_group_fm100 uses for categories -- this
+    module's own docstring covers why that's the applicable dataviz-skill
+    check for a line chart, not the stricter all-pairs scatter rule), so
+    at most len(FULL_PALETTE) (8) subjects -- beyond that, no more hues
+    can be handed out without cycling, so use plot_subjects_grid_fm100
+    instead for bigger groups. The group mean is intentionally thicker
+    (MEAN_LINE_COLOR, outside FULL_PALETTE so it never collides with a
+    subject's own color) than any individual line. kind/window/
+    label_mode/show_cap_wheel/show_cap_colors: see plot_group_fm100."""
+    if kind not in ("linear", "radial"):
+        raise ValueError(f"kind must be 'linear' or 'radial', got {kind!r}")
+    if label_mode not in ("angle", "cap"):
+        raise ValueError(f"label_mode must be 'angle' or 'cap', got {label_mode!r}")
+    resolved_ids = sorted(sub_ids) if sub_ids is not None else subjects_in_group(df, group=group, subgroup=subgroup)
+    if len(resolved_ids) > len(FULL_PALETTE):
+        raise ValueError(f"plot_group_all_subjects_fm100 supports at most {len(FULL_PALETTE)} subjects, got {len(resolved_ids)}")
+    if ax is None:
+        ax = _new_axes(kind)
+
+    profiles = group_profiles(df, group=group, subgroup=subgroup, sub_ids=sub_ids, window=window)
+    x = CAP_ANGLES if kind == "radial" else CAP_POSITIONS
+    for sub_id, profile, color in zip(resolved_ids, profiles, FULL_PALETTE):
+        plot_x, plot_y = _radial_xy(x, profile, kind=kind)
+        ax.plot(plot_x, plot_y, color=color, linewidth=1.25, label=sub_id)
+    plot_x, plot_mean = _radial_xy(x, profiles.mean(axis=0), kind=kind)
+    ax.plot(plot_x, plot_mean, color=MEAN_LINE_COLOR, linewidth=2.75, label=f"group mean (n={len(profiles)})")
+
+    label = subgroup or group or "selected"
+    title = f"{label} participants -- individual FM100 profiles"
+    if kind == "linear":
+        _style_linear_axes(ax, title=title)
+        if show_cap_colors:
+            _draw_cap_colors_linear(ax)
+    else:
+        ax.set_title(title)
+        _finish_radial_axes(ax, show_cap_wheel=show_cap_wheel, label_mode=label_mode)
+    ax.legend(fontsize=8)
+    return ax
+
+
+def plot_subjects_grid_fm100(
+    df: pd.DataFrame,
+    sub_ids: list[str],
+    *,
+    kind: str = "linear",
+    window: int = 1,
+    label_mode: str = "angle",
+    show_cap_wheel: bool = False,
+    show_cap_colors: bool = False,
+    share_ylim: bool = True,
+    ncols: int = 4,
+) -> plt.Figure:
+    """plot_subject_fm100, one panel per subject (that subject's own
+    sessions overlaid, SESSION_COLORS), laid out in a grid -- the
+    per-session counterpart to plot_group_all_subjects_fm100's pooled
+    overlay, for groups small enough (e.g. PD, n=10) to show every
+    subject's individual session traces at once rather than one pooled
+    profile each. Panels beyond len(sub_ids) are blanked, same pattern as
+    plot_feature_boxplots_grid. share_ylim=True (default): every panel
+    gets the same y-range (r-range for radial), the max error over every
+    session of every subject in sub_ids plus 5% headroom -- panels next to
+    each other should read on the same scale, or a visually "bigger" loop
+    can just mean a smaller per-subject autoscale, not a bigger error.
+    Set False to autoscale each panel to its own subject instead."""
+    if kind not in ("linear", "radial"):
+        raise ValueError(f"kind must be 'linear' or 'radial', got {kind!r}")
+    ncols = min(ncols, len(sub_ids))
+    nrows = -(-len(sub_ids) // ncols)  # ceil
+    panel_size = 3.2
+    fig, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=(panel_size * ncols, panel_size * nrows),
+        subplot_kw={"projection": "polar"} if kind == "radial" else None,
+    )
+    axes = np.atleast_1d(axes).flatten()
+
+    ylim = None
+    if share_ylim:
+        peak = max(
+            _subject_profile(df, sub_id, session, window=window).max()
+            for sub_id in sub_ids
+            for session in df.loc[df["sub_id"] == sub_id, "session"].unique()
+        )
+        ylim = (0, peak * 1.05)
+
+    for ax, sub_id in zip(axes, sub_ids):
+        if kind == "radial":
+            ax.set_theta_direction(-1)  # _new_axes' own setup -- these axes come straight from plt.subplots, not _new_axes
+        plot_subject_fm100(df, sub_id, kind=kind, window=window, label_mode=label_mode, show_cap_wheel=show_cap_wheel, show_cap_colors=show_cap_colors, ylim=ylim, ax=ax)
+        if kind == "linear":
+            # RADIAL_TICK_STEP's 17 labels (tuned for a full-width single
+            # plot) collide at grid-panel width -- re-space to a coarser
+            # step that still reads once panels are this narrow.
+            _apply_cap_labels_linear(ax, step=RADIAL_TICK_STEP * 3)
+    for ax in axes[len(sub_ids) :]:
+        ax.axis("off")
+    fig.tight_layout()
+    return fig

@@ -140,6 +140,18 @@ wheels = [
 ]
 
 [[package]]
+name = "bci2kreader"
+version = "0.32.dev0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/72/33/ab9745a920b73bb4fc01d40bd88e6250369760d425762540e9779b9c1fa1/BCI2kReader-0.32.dev0.tar.gz", hash = "sha256:f61647c41db628f063b9741a01c8748b39cee1377e4cbcdd8979315783c2c951", size = 11413, upload-time = "2020-07-29T13:35:28.138Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e7/80/313305c8a7732efb743b05790b9ec17ee4ca25be1f9017c316dfce2ce509/BCI2kReader-0.32.dev0-py3-none-any.whl", hash = "sha256:2ebb6d3a29a2f7c1d63bfe89bef5bd25694413573e7c5c85364078157e15e460", size = 24681, upload-time = "2020-07-29T13:35:26.319Z" },
+]
+
+[[package]]
 name = "beautifulsoup4"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -474,6 +486,7 @@ name = "data-analysis"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "bci2kreader" },
     { name = "hotelling" },
     { name = "ipykernel" },
     { name = "matplotlib" },
@@ -497,6 +510,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "bci2kreader", specifier = ">=0.32.dev0" },
     { name = "hotelling", specifier = ">=0.5.0" },
     { name = "ipykernel", specifier = "<7" },
     { name = "matplotlib", specifier = ">=3.11.1" },

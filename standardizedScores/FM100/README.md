@@ -76,6 +76,23 @@ in `load_fm100_raw` drops it.
   (M3) -- one Tukey-whiskered box per group/subgroup with every subject's
   own value scattered, jittered, and id-labeled on top; outliers
   (`comparisons.tukey_outlier_mask`) get a black edge and bold label.
+  `plot_group_all_subjects_fm100`/`plot_subjects_grid_fm100` (M4) -- for
+  groups bigger than `SUBJECT_COLORS` (4, e.g. PD's 6 unique subjects):
+  the former overlays every matching subject's own profile, each in its
+  own `FULL_PALETTE` color and legend entry (fixed order by sorted
+  sub_id, capped at `FULL_PALETTE`'s 8 validated slots -- raises past
+  that, use the grid function instead of cycling hues), plus the group
+  mean in a heavier, dedicated `MEAN_LINE_COLOR` line that never collides
+  with a subject's own color; the latter grids `plot_subject_fm100` one
+  panel per subject (that
+  subject's own sessions overlaid via `SESSION_COLORS`) for the
+  small-group, per-session view, re-spacing linear panels' x-tick labels
+  to a coarser step than the single-plot default since it collides at
+  grid-panel width. `plot_subject_fm100`'s new `ylim` param (applied
+  before the radial hole/wheel) lets `plot_subjects_grid_fm100`'s
+  `share_ylim=True` default put every panel on the same y-range (r-range
+  for radial) -- a bigger loop/peak means a bigger error, not a smaller
+  per-subject autoscale; `share_ylim=False` restores independent scales.
 - `scripts/comparisons.py` -- M2: `compare_fm100_feature` (Mann-Whitney U +
   effect size on `subject_pooled_scores`, mirroring
   `beh/scripts/features.py`'s `compare_shape_feature`) over `FEATURES`
