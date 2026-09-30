@@ -38,8 +38,8 @@ def df():
 
 def test_load_behavioral_has_expected_shape_and_columns(df):
     assert list(df.columns) == ["sub_id", "session", "click", "red", "green", "group", "subgroup", "date", "folder"]
-    assert len(df) == 1610
-    assert df["sub_id"].nunique() == 48
+    assert len(df) == 1630
+    assert df["sub_id"].nunique() == 49
 
 
 def test_part_type_maps_to_group_matching_ssveps_metadata(df):
@@ -52,7 +52,7 @@ def test_part_type_maps_to_group_matching_ssveps_metadata(df):
         if sub_id in overlap.index:
             assert group == overlap[sub_id]
             checked += 1
-    assert checked == 44  # every ssveps-known subject in this dataset
+    assert checked == 45  # every ssveps-known subject in this dataset
 
 
 def test_subgroup_is_populated_for_every_cvd_subject(df):
@@ -71,7 +71,7 @@ def test_subgroup_is_na_for_subjects_missing_from_ssvep_metadata(df):
 def test_subjects_in_group_filters_correctly(df):
     protan = loader.subjects_in_group(df, subgroup="protan")
     assert set(protan) == set(df.loc[df["subgroup"] == "protan", "sub_id"].unique())
-    assert len(loader.subjects_in_group(df)) == 48
+    assert len(loader.subjects_in_group(df)) == 49
 
 
 # --- comparisons (Hotelling T^2) ----------------------------------------
@@ -215,12 +215,12 @@ def test_plot_subjects_grid_wraps_at_max_panel_cols(df):
 
 
 def test_plot_subjects_grid_respects_max_cols_override(df):
-    """dashboard M3: the raw-clicks tab wants an even 4+4 layout at 8
-    subjects, not MAX_PANEL_COLS' default 5+3."""
-    sub_ids = loader.subjects_in_group(df, subgroup="protan")  # 8 subjects
+    """dashboard M3: the raw-clicks tab wants 4 columns, not MAX_PANEL_COLS'
+    default 5."""
+    sub_ids = loader.subjects_in_group(df, subgroup="protan")  # 9 subjects
     fig = plotting.plot_subjects_grid(df, sub_ids=sub_ids, max_cols=4)
     rows, cols = fig.axes[0].get_subplotspec().get_gridspec().get_geometry()
-    assert (rows, cols) == (2, 4)
+    assert (rows, cols) == (3, 4)
 
 
 def test_plot_groups_side_by_side_one_panel_per_category(df):
