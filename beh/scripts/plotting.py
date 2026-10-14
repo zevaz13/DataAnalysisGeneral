@@ -395,3 +395,30 @@ def plot_subjects_cloud_overlay(
     _style_axes(ax, xlim=xlim, ylim=ylim, title="Participants (all sessions pooled)")
     ax.legend(fontsize=8)
     return ax
+
+
+def plot_press_comparison(
+    runs: dict[str, pd.DataFrame], *, xlim: tuple[float, float] = XLIM, ylim: tuple[float, float] = YLIM, ax: plt.Axes | None = None
+) -> plt.Axes:
+    """Overlay several `load_presses_json` runs on one red/green axes, one
+    color per run, labeled by its dict key (e.g. '10Hz')."""
+    if ax is None:
+        _, ax = plt.subplots(figsize=(5, 4))
+    for label, run in runs.items():
+        ax.scatter(run["red"], run["green"], s=20, alpha=0.7, label=label)
+    _style_axes(ax, xlim=xlim, ylim=ylim)
+    ax.legend()
+    return ax
+
+
+def plot_press_medians(
+    runs: dict[str, pd.DataFrame], *, xlim: tuple[float, float] = XLIM, ylim: tuple[float, float] = YLIM, ax: plt.Axes | None = None
+) -> plt.Axes:
+    """One marker per run at the median (red, green) of its presses."""
+    if ax is None:
+        _, ax = plt.subplots(figsize=(5, 4))
+    for label, run in runs.items():
+        ax.scatter(run["red"].median(), run["green"].median(), s=80, marker="D", label=label)
+    _style_axes(ax, xlim=xlim, ylim=ylim)
+    ax.legend()
+    return ax

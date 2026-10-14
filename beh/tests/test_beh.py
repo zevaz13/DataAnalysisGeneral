@@ -446,3 +446,13 @@ def test_plot_subjects_outliers_grid_wraps_at_max_panel_cols(df):
     assert (rows, cols) == (2, plotting.MAX_PANEL_COLS)
     visible = [ax for ax in fig.axes if ax.axison]
     assert len(visible) == len(sub_ids)
+
+
+def test_load_presses_json():
+    root = Path(__file__).resolve().parents[2]
+    import loader as ld
+
+    df = ld.load_presses_json(str(root / "beh_presses_TestUPstairs_20261008_142156_RG10Hz.json"))
+    assert list(df.columns) == ["click", "red", "green", "freq"]
+    assert len(df) == 30
+    assert (df["freq"] == 10).all()

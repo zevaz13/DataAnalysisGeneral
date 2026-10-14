@@ -78,7 +78,9 @@ far. See `docs/findings.md` section 2.
   -- nothing here filters persisted data. Read as an honest "nothing
   alarming turned up" rather than a case for adding automatic rejection to
   the pipeline by default.
-
+### M5. Add support and plot new format files
+- [x] the new format behavioral files come as a JSON file. see "beh_presses_TestUPstairs_20261008_142156_RG10Hz" and "beh_presses_TestUPstairs_20261008_142156_RG20Hz", please make changes to provide support to these type of files. Done: `loader.load_presses_json`.
+- [x] create a notebook in python that compares the 2 responses shown in these 2 files. Plot them in the same axes, use as labels only "10Hz" and "20Hz". Done: `notebooks/07_press_comparison.ipynb`, `plotting.plot_press_comparison`.
 ## Next milestones
 
 To be defined together.

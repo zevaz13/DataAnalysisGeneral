@@ -12,6 +12,7 @@ step to remember to rerun, always consistent with ssveps' own hand-corrected
 values).
 """
 
+import json
 import os
 
 import pandas as pd
@@ -71,3 +72,16 @@ def subjects_in_group(df: pd.DataFrame, *, group: str | None = None, subgroup: s
     if subgroup is not None:
         sub = sub[sub["subgroup"] == subgroup]
     return sorted(sub["sub_id"].unique())
+
+
+def load_presses_json(path: str) -> pd.DataFrame:
+    """New-format behavioral file (one JSON per run, `beh_presses_*.json`):
+    {"metadata": {...}, "columns": [...], "data": [[...], ...]}. Returns one
+    row per press with `click` (TrialNumber), `red`, `green` and `freq` (Hz,
+    from the metadata) -- the same red/green naming as `load_behavioral`."""
+    with open(path) as f:
+        raw = json.load(f)
+    df = pd.DataFrame(raw["data"], columns=raw["columns"])
+    df = df.rename(columns={"TrialNumber": "click", "Red": "red", "Green": "green"})
+    df["freq"] = int(raw["metadata"]["freq"])
+    return df[["click", "red", "green", "freq"]]
