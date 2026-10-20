@@ -53,7 +53,7 @@ def template():
 
 def test_load_fm100_raw_has_expected_shape_and_columns(df):
     assert list(df.columns) == ["sub_id", "session", "group", "subgroup", "sex", "date", "caps"]
-    assert len(df) == 71  # 72 raw rows minus the byte-identical duplicate MET000 row
+    assert len(df) == 73  # 74 raw rows minus the byte-identical duplicate MET000 row
 
 
 def test_duplicate_first_row_is_dropped(df):
