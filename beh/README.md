@@ -10,6 +10,22 @@ not copied into the repo). Already tidy, one row per click -- no build step.
 Function-by-function reference: `docs/beh_api_reference.md`. Plan and
 milestone status: `../PLANbeh.md`.
 
+## Adding new sessions
+
+New sessions arrive as one `.json` file each in `/home/sebas/data/manualTest/`.
+Add a row for each to `participant_beh_record2026.xlsx` (file name in
+`FolderFile`, `Date`, `Session`, `SUB_ID`, a 1 under exactly one of
+`CVD`/`HC`/`PD`, and `added` = 0), then run:
+
+```bash
+uv run python beh/scripts/update_table.py [data_dir]
+```
+
+Every row with `added == 0` has its trials appended to `behavioral_table.csv`
+(`FolderOrg` = the file name) and is set to `added = 1` in the xlsx. The CSV is
+backed up to `behavioral_table.csv.bak` first (overwritten each run).
+`PartType`: HC=1, CVD=2, PD=3.
+
 ## Fields (raw `behavioral_table.csv`, as loaded by `loader.load_behavioral`)
 
 Raw column -> tidy column, renamed for consistency with `ssveps/`'s naming:
