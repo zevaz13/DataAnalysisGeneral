@@ -35,3 +35,17 @@ runs share a name, so key by xlsx `RunNumber`. Grid `sequence` is 1-based
 - [x] `notebooks/02_freq_explore.ipynb`: summary, fixed, linear, grid
   (presentation order, per-green lines, raw heatmap; x red, y green)
 - [ ] Compare 10 vs 20 Hz in the grid (baseline normalization, difference map)
+
+## M3. NF vs YF test (BRtest)
+
+Data: `/home/sebas/data/blueRedLinear/BRtest/MET0xx.mat` (same `testData`
+format). Per participant: `base_{NF,YF}` (8 trials), `BR_{NF,YF}_{1,2}` (2
+leading baseline samples + 11 steps). Steps are blue DAC 0-1700 (linear)
+against fixed red 1800. MET050, MET051: CTR. Hypothesis: blue-deficient
+participants show YF ~ NF, controls separate.
+
+- [x] `notebooks/03_brtest_explore.ipynb`: raw BR curves, normalised to
+  8-trial base mean (per filter), normalised to leading baselines, NF-YF
+  difference
+- [ ] Decide on a per-participant NF-vs-YF summary number
+- [ ] Add participants as they come in (list `PARTICIPANTS` in the notebook)
