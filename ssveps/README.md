@@ -3,7 +3,7 @@
 SSVEP (steady-state visual evoked potential) grid experiment data.
 
 Raw data: `/home/sebas/data/ssveps/` (read in place, not copied into the repo).
-62 MATLAB `.mat` files, one per subject/session, 43 unique subjects. Filename
+68 MATLAB `.mat` files, one per subject/session, 49 unique subjects. Filename
 is `METxxx[b].mat`: `METxxx` is the subject id, the optional trailing letter
 is the session (no letter = session 1, `b` = session 2; the plan's `c`/session
 3 does not occur in this dataset).
