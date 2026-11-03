@@ -347,8 +347,8 @@ def test_correct_multiple_comparisons_none_of_the_real_pooled_pairs_survive(beh_
 def test_paired_subjects_matches_known_counts():
     """Pins the real paired-subject counts behind this project's reliability
     gap -- protan/deutan/CVD(combined) are all too thin to assess."""
-    assert len(session_reliability.paired_subjects()) == 19
-    assert len(session_reliability.paired_subjects(group="CTR")) == 13
+    assert len(session_reliability.paired_subjects()) == 22
+    assert len(session_reliability.paired_subjects(group="CTR")) == 16
     assert len(session_reliability.paired_subjects(group="PD")) == 4
     assert len(session_reliability.paired_subjects(group="CVD")) == 2
     assert len(session_reliability.paired_subjects(group="CVD", subgroup="protan")) == 2
@@ -368,7 +368,7 @@ def test_session_correlation_comparison_raises_below_minimum(beh_df):
 def test_session_overlap_comparison_returns_one_row_per_session(beh_df, runmap_df, baselines_df, metadata_df):
     result = session_reliability.session_overlap_comparison(beh_df, runmap_df, baselines_df, metadata_df, group="CTR", n_perm=200, seed=0)
     assert list(result["session"]) == [1, 2]
-    assert (result["n"] == 13).all()
+    assert (result["n"] == 16).all()
 
 
 def test_session_correlation_comparison_returns_both_sessions(beh_df):

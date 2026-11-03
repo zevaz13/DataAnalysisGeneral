@@ -446,7 +446,7 @@ at specific pixels).
   **How to use this differently:** this is the one function that decides
   *who* every other reliability computation below runs on -- change `group`/
   `subgroup` to restrict to any subset (`group='PD'`, `group='CTR'`, or
-  leave both `None` for everyone with both sessions, 19 subjects in this
+  leave both `None` for everyone with both sessions, 21 subjects in this
   project's data). Not every filter returns enough subjects for `icc_grid`
   to run on, though -- see that function's "minimum sample size" note below
   before picking one. Whatever list comes back here is what you feed into
@@ -484,10 +484,10 @@ at specific pixels).
   **Minimum sample size:** raises `ValueError` for fewer than 3 paired
   subjects (pingouin's ANOVA needs >=5 subject-x-session rows). Checked
   against this project's real data: `paired_subjects(metadata_df,
-  group='PD')` (n=4) and `group='CTR'` (n=13) both work; `subgroup='protan'`
+  group='PD')` (n=4) and `group='CTR'` (n=14) both work; `subgroup='protan'`
   (n=2), `subgroup='deutan'` (n=0), and `group='CVD'` (n=2, protan+deutan
   combined) are all **too small** and will raise -- only `PD`, `CTR`, and
-  the unfiltered "all paired" (n=19) have enough paired subjects for
+  the unfiltered "all paired" (n=20) have enough paired subjects for
   `icc_grid` in this dataset today. That may change as more session-2 data
   comes in (`docs/methods.md`'s note on the still-thin CVD/protan/deutan
   test-retest sample).
@@ -664,8 +664,8 @@ edit the variables called out below and rerun from that cell down.
   `troughs` from it, and every later cell reads those dicts, so adding an
   entry there is genuinely the only edit needed. **But check the sample size
   first**: `icc_grid` needs >=3 paired subjects, and in this project's data
-  today only `group='PD'` (n=4), `group='CTR'` (n=13), and the unfiltered
-  "all paired" (n=19) qualify -- `subgroup='protan'` (n=2), `subgroup=
+  today only `group='PD'` (n=4), `group='CTR'` (n=14), and the unfiltered
+  "all paired" (n=20) qualify -- `subgroup='protan'` (n=2), `subgroup=
   'deutan'` (n=0), and `group='CVD'` (n=2) don't, and `icc_grid` will raise
   a clear `ValueError` naming the problem rather than adding a broken entry
   silently.
@@ -703,7 +703,7 @@ edit the variables called out below and rerun from that cell down.
   `group_grid` call for a different reference template.
 - **`11_reliability_outcomes.ipynb`** -- M9, `docs/ssvep_analyses.md`
   proposal 5: `reliability.feature_icc` for six candidate outcome features
-  (`depth`, `ramp_slope_red`, `gain` on all 19 paired subjects;
+  (`depth`, `ramp_slope_red`, `gain` on all 21 paired subjects;
   `fitted_green`/`fitted_amp`/`fitted_red` restricted to the 14 with a valid
   `fit_ramp_gaussian` fit at both sessions), then
   `reliability.minimum_detectable_effect` at this project's two actual

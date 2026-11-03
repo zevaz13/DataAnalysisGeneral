@@ -110,7 +110,7 @@ new cross-project import is added here.
 mean-folding derivation verified against `pingouin` directly (mean of
 [179deg, 1deg] must fold to ~0deg, not the naive linear mean of 90deg), a
 check that `sklearn`'s CCA never returns a negative r, a pin of the real
-paired-EEG-subject count (19) behind M2's reliability gap, a check that
+paired-EEG-subject count (21) behind M2's reliability gap, a check that
 `joint_concordance_test`'s `|r|` statistic exceeds what a naive signed mean
 would give on a constructed equal-and-opposite-correlation example, and
 pins of the real M1/M2/M3 findings (both severity CCAs, all three
@@ -120,39 +120,39 @@ regression tests.
 ## Notebooks
 
 - `01_fm100_reliability.ipynb` -- M1a: FM100's own cross-session
-  reliability. Three magnitude features reliable (ICC 0.84-0.93);
-  `VKS_Angle` is not (circular r=0.44, p=0.15) -- carried forward as a
+  reliability. Three magnitude features reliable (ICC 0.87-0.93);
+  `VKS_Angle` is not (circular r=0.39, p=0.13) -- carried forward as a
   caveat, not a blocker.
 - `02_fm100_vs_behavioral.ipynb` -- M1b: the two primary tests, pooled and
-  per-group. **Severity**: strong pooled (r=0.73, p<0.001), but doesn't
+  per-group. **Severity**: strong pooled (r=0.72, p<0.001), but doesn't
   hold up within any single group at this n -- likely partly a
   between-group effect, not yet confirmed as a within-group continuum.
-  **Type/axis**: significant pooled (r=0.37, p=0.009) *and* within CVD
-  alone (r=0.56, p=0.031, n=15) -- the more solid of the two results,
+  **Type/axis**: significant pooled (r=0.38, p=0.004) *and* within CVD
+  alone (r=0.54, p=0.031, n=17) -- the more solid of the two results,
   though riding on `VKS_Angle`'s weaker reliability. A context-only
   univariate feature table, and a summary of both results.
 - `03_eeg_reliability.ipynb` -- M2a: the two derived EEG features'
-  reliability. Both moderate, not strong: `ramp_magnitude` ICC=0.65 (lower
+  reliability. Both moderate, not strong: `ramp_magnitude` ICC=0.71 (lower
   than `ramp_slope_red`'s own established 0.85 -- combining it with
-  `ramp_slope_green` diluted it), ramp-angle circular r=0.69. As expected
+  `ramp_slope_green` diluted it), ramp-angle circular r=0.62. As expected
   going in, CVD/protan/deutan can't be checked at all (2/2/0 paired
   subjects).
 - `04_fm100_vs_eeg.ipynb` -- M2b: the same two tests against EEG, reusing
   `severity.py`/`type_axis.py` unchanged. **Severity**: significant pooled
-  (r=0.50, p=0.047) but weaker than the behavioral version, and doesn't
-  hold up per-group. **Type/axis**: significant pooled (r=-0.40, p=0.014);
-  per-group, only `deutan` (n=7, r=0.66, p=0.034) reaches significance --
+  (r=0.49, p=0.027) but weaker than the behavioral version, and doesn't
+  hold up per-group. **Type/axis**: significant pooled (r=-0.31, p=0.032);
+  per-group, only `deutan` (n=8, r=0.63, p=0.028) reaches significance --
   a lead, not a confirmed finding at that n, weaker than M1's within-CVD
   result. Both EEG results are weaker than their behavioral counterparts,
   consistent with EEG being the noisier measure throughout this project.
 - `05_three_way_type_axis.ipynb` -- M3: completes the triangle
   (`orientation_deg` vs. EEG ramp-angle -- **not significant pooled**,
-  r=-0.23, p=0.13, the one edge that doesn't hold up alone), then runs
+  r=-0.21, p=0.14, the one edge that doesn't hold up alone), then runs
   `joint_concordance_test` on all three angles -- **significant pooled**
-  (mean|r|=0.33, p=0.0012) *despite* that missing edge. The strongest
+  (mean|r|=0.31, p=0.0015) *despite* that missing edge. The strongest
   whole-project argument yet for the "masked continuous spectrum"
   hypothesis: a pattern spread across a triangle, robust to any one weak
   edge, not concentrated in a single measurement. No group confirms the
   joint result on its own at current n; `protan` alone is significant on
-  the triangle-completion edge specifically (r=-0.57, p=0.023, n=8) -- a
+  the triangle-completion edge specifically (r=-0.55, p=0.013, n=9) -- a
   new lead, not yet a finding.

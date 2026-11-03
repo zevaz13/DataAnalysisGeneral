@@ -7,6 +7,10 @@ so rather than proposing an analysis that will not survive contact with it.
 
 Read section 1 first. It changes what the rest of the document is for.
 
+The numbers in this document are a snapshot from when each proposal was
+written (n=43 subjects or fewer). Current values after later additions are
+in `docs/ssvep_summary.md` section 1 and `docs/findings.md`.
+
 ---
 
 ## 1. The binding constraint is power, not method
@@ -197,7 +201,7 @@ the ramp's intercept is a gain measure. They are separable by construction.
 
 ## 5. Choose outcome measures by their test-retest reliability, not their appeal
 
-You have 19 subjects with two sessions. That is enough to rank candidate
+You have 20 subjects with two sessions. That is enough to rank candidate
 measures by reliability, and reliability caps the effect size any measure can
 ever detect. Doing this *first* is the cheapest power gain available.
 

@@ -25,7 +25,7 @@ raw data's trial ordering). `analysis.baseline_values(..., trials=)` selects
 pools baseline trials across every run of the session. Aggregate/group
 functions (`mean_grid`, `group_grid`, etc.) always operate on one fixed
 `session` at a time -- passing a `group`/`subgroup` filter across sessions
-would double-count the ~19 subjects who have both session 1 and 2.
+would double-count the ~20 subjects who have both session 1 and 2.
 
 ## Normalization formulas
 
@@ -140,8 +140,8 @@ mean different things:
   is reporting the edge of what the sampled range can express rather than a
   located dip. Common and physiologically meaningful here: most protan
   subjects peg `fitted_red` at `max(red_vals)`, i.e. their isoluminant point
-  lies beyond the sampled red range (11/15 CVD subjects at session 1 vs.
-  4/21 CTR, Fisher exact p=0.0019 -- M6, `docs/ssvep_analyses.md` proposal
+  lies beyond the sampled red range (13/17 CVD subjects at session 1 vs.
+  5/24 CTR, Fisher exact p=0.0011 -- M6, `docs/ssvep_analyses.md` proposal
   2, `08_cvd_gamut.ipynb`).
 - **`fit_valid`** -- the dip is deep enough to be real (`amp` above
   `min_snr` times the residual SD, default `min_snr=2.0`) **and** not
@@ -180,11 +180,11 @@ measurement -- McGraw & Wong 1996 notation) is exactly the template's MATLAB
 `ICC(..., 'A-1')`, including matching CI/F/p columns.
 
 **The CVD/protan/deutan test-retest sample is currently too thin to use.**
-Of the 19 subjects with both sessions, only 2 are protan and 0 are deutan
+Of the 21 subjects with both sessions, only 2 are protan and 0 are deutan
 (so `group='CVD'` combined is n=2) -- `pingouin`'s underlying ANOVA needs at
 least 3 subjects, and `icc_grid` raises a clear `ValueError` rather than
 silently running on too little data. Only `group='PD'` (n=4), `group='CTR'`
-(n=13), and the unfiltered full paired set (n=19) currently have enough
+(n=15), and the unfiltered full paired set (n=21) currently have enough
 paired subjects for a reliability analysis. This will change if/when more
 session-2 data for the CVD subgroups is collected -- no code change would be
 needed, just enough subjects for the existing `ValueError` to stop firing.
@@ -336,7 +336,7 @@ to diverge -- don't treat a mismatch between the two as a bug.
 **Real-data finding.** After removing gain, PD's and deutan's residuals at
 the CTR template's trough are indistinguishable from zero (one-sample t-test
 vs. 0: p=0.56, p=0.63) -- no trough-specific effect beyond gain for either.
-Protan's is not (mean -0.10, p=0.030, n=8, one test, uncorrected) -- a
+Protan's is not (mean -0.11, p=0.011, n=9, one test, uncorrected) -- a
 genuine shape effect. This connects to M6: protan had the shallowest
 `ramp_slope_red` of the three groups, i.e. the trough sitting furthest beyond
 the sampled range on average, which is exactly what would put a protan
@@ -345,11 +345,11 @@ descending ramp rather than recovering the way CTR's template does past its
 own dip.
 
 **Cross-check against M6's separable measures.** `gain` (this decomposition)
-correlates strongly with `ramp_intercept` (M6's `fit_ramp`, r=0.87,
-p<1e-13) -- two independently-derived gain proxies agree well, good evidence
+correlates strongly with `ramp_intercept` (M6's `fit_ramp`, r=0.86,
+p<1e-14) -- two independently-derived gain proxies agree well, good evidence
 "gain" is a real, robustly-measurable axis here. `trough_region_residual`
-does **not** correlate with `fitted_amp` (M4/M6's `fit_ramp_gaussian`, r=0.04,
-p=0.79) -- not a failure, they measure different things: `fitted_amp` is
+does **not** correlate with `fitted_amp` (M4/M6's `fit_ramp_gaussian`, r=-0.14,
+p=0.32) -- not a failure, they measure different things: `fitted_amp` is
 subject-centered (this subject's own dip depth, wherever their dip is);
 `trough_region_residual` is template-centered (the residual at one fixed
 external location). They can disagree completely for a subject whose own
@@ -365,13 +365,13 @@ values instead of one grid cell's. Three features are defined for every
 paired subject regardless of fit quality (`depth`, M6's `ramp_slope_red`, M8's
 `gain`); three depend on `fit_ramp_gaussian` locating an actual dip
 (`fitted_green`/`fitted_amp`/`fitted_red`) and are restricted to the subjects
-where that fit was `fitted_valid` at both sessions -- 14 of the 19 paired
+where that fit was `fitted_valid` at both sessions -- 14 of the 21 paired
 subjects, matching how `docs/ssvep_analyses.md` proposal 5 originally
 computed these three (confirmed: this project's ICC on that same 14-subject
 filter reproduces the document's plain-Pearson-correlation numbers closely,
 e.g. `fitted_red` 0.18 ICC vs. the document's r=0.17).
 
-**Primary outcome measure, updated (2026-08-20).** `depth` (ICC=0.76) was the
+**Primary outcome measure, updated (2026-08-20).** `depth` (ICC=0.73) was the
 best of the original four candidates and the previous recommendation. Since
 then, M6's `ramp_slope_red` (ICC=0.85) and M8's `gain` (ICC=0.90) turned out
 to be *more* reliable, not just comparably reliable -- both are now the
@@ -392,7 +392,7 @@ mean difference is unaffected by measurement noise on average). Dividing the
 standard two-sample-t-test minimum detectable *observed* effect by
 `sqrt(icc)` gives the smallest *true* effect that could still survive that
 much attenuation: `d_true = d_observed / sqrt(icc)`. At this project's
-PD-vs-CTR sample size (n=6, 21), `fitted_red`'s ICC pushes the minimum
+PD-vs-CTR sample size (n=6, 24), `fitted_red`'s ICC pushes the minimum
 detectable true effect past d=3 -- larger than the largest effect size seen
 anywhere in this dataset so far (proposal 1's PD-vs-CTR trough-depth effect,
 d=0.45). That's what makes `fitted_red` unusable, not just "less good."
@@ -419,27 +419,28 @@ permutation-testing idea `permutation.py` (M3) and the bootstrap CIs (M6,
 M7) already use elsewhere in this project, rather than introducing a new
 paradigm for one milestone.
 
-**Real-data finding.** PC1 alone explains 75% of the variance and is the
-only component that clears the permutation noise floor -- stricter than
-proposal 7's own expectation of "two or three" trustworthy components (PC2's
-observed ratio, 5.4%, sits just below its rank's null threshold, 6.1%). This
-doesn't mean PC2/PC3 carry zero signal, just that they aren't statistically
-distinguishable from what 100 correlated-but-otherwise-unstructured cells
-would produce by chance at n=43.
+**Real-data finding.** PC1 alone explains 74% of the variance. At n=49,
+PC2 also clears the permutation noise floor, narrowly (observed ratio 6.1%
+vs. a null threshold of 5.7%), giving two trustworthy components -- within
+proposal 7's own expectation of "two or three". At n=43 only PC1 cleared it
+(PC2's ratio, 5.4%, sat just below its threshold, 6.1%), so PC2's status is
+sample-size sensitive. PC3 (4.3% vs. 5.3%) is not distinguishable from what
+100 correlated-but-otherwise-unstructured cells would produce by chance.
 
 **PC1 is the gain axis, found a third independent way.** PC1's loading is
 uniform in sign across almost the whole grid (a flat, whole-surface pattern,
 not something localized near the trough), and its scores correlate at r=-0.93
-with M8's `gain` and equally strongly with M6's `ramp_intercept` -- three
+with M6's `ramp_intercept` (M8's `gain` correlates with `ramp_intercept` at r=0.86) -- three
 completely independent derivations (unsupervised PCA with no group labels or
 template; a template regression; a ramp fit's intercept) converging on the
 same axis. Good evidence "gain" is the dominant real axis of variation in
 this dataset, not an artifact of one fitting choice. PC1 doesn't separate PD
-from CTR (p=0.63, same underpowered story as everywhere else for PD), but
-comes closer to separating protan from deutan (p=0.092) than any single
-M6/M8 measure did -- consistent with proposal 7's claim that combining all
-100 cells into one component improves SNR over any individual derived
-measure, though "closer" is not "significant."
+from CTR (p=0.67, same underpowered story as everywhere else for PD) or
+protan from deutan (p=0.61); it was closest to separating protan from
+deutan (p=0.092) at n=7 deutan, but that did not survive MET048 and later
+additions, so proposal 7's claim that combining all 100 cells into one
+component improves SNR over any individual derived measure has no
+support for the subtype question so far.
 
 ## Cluster-based permutation testing (M3)
 
@@ -492,23 +493,21 @@ own default is 4-connected (cross-shaped), so this must be passed explicitly.
 p-value -- "significant" means at least one cluster survives correction, and
 that depends on the RNG draw. `15_permutation_stability.ipynb` re-ran all
 three variants on protan vs. deutan (percent change, session 1) at 200
-independent seeds each, everything else held fixed. Result: **a corrected-
-significant cluster is found in 173/200 (size), 190/200 (weighted), and
-196/200 (directional) seeds** -- this is not a borderline, seed-sensitive
-result. The surviving cluster sits in the low-red/high-green corner of the
-grid (roughly red <= 1400, green >= 1300) and is consistently positive
-(protan's response higher than deutan's there).
+independent seeds each, everything else held fixed. Result with 7
+deutan subjects (the original M11 run): a corrected-significant cluster in
+173/200 (size), 190/200 (weighted), and 196/200 (directional) seeds, in the
+low-red/high-green corner of the grid, protan higher than deutan. **That did
+not survive adding MET048 (deutan): 0/200 for all three variants, and still
+0/200 at the current 9 protan vs. 8 deutan.** Dropping MET048 alone restores
+it (see `docs/findings.md`), so the earlier result was fragile (its seed-0
+p-value was 0.046) despite being seed-stable. Seed stability protects against
+RNG luck, not against a small sample.
 
-This sits alongside, not against, M6's `ramp_slope_red` finding (Welch
-p=0.44) and M10's PCA PC1 finding (p=0.092) for the same protan-vs-deutan
-question -- those are both single-scalar summaries of the *whole* grid
-(a linear slope, a leading principal component), and neither is built to
-detect a difference localized to one corner of it. The cluster-based test is
-exactly the tool for that. Read together: protan and deutan grids likely do
-differ, but in a spatially localized way that a whole-grid summary measure
-averages away -- worth carrying into any future subtype-outcome work, and a
-concrete lead for M12+ rather than treating protan-vs-deutan as flatly
-"not yet significant."
+This also reframes M6's `ramp_slope_red` (Welch p=0.33) and M10's PCA PC1
+(p=0.61) for the same protan-vs-deutan question: they were never in
+conflict with the cluster test, and now all three agree that protan vs.
+deutan is not resolved by the EEG grid at this sample size. Treat the
+corner-localized difference as a lead, not a finding.
 
 ## `metadata.csv`: hand-edits are permanent, and preserved by default
 

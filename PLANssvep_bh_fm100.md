@@ -125,8 +125,8 @@ docs/ssvep_beh_fm100_api_reference.md
 - [x] FM100 cross-session reliability: ICC(A,1) for the three magnitude
   features, `circ_corrcc` for `VKS_Angle` (periodic -- a linear ICC would
   be wrong for it), `01_fm100_reliability.ipynb`. **Result: `TES`
-  (ICC=0.92), `VKS_MinRad` (ICC=0.93), `VKS_MajRad` (ICC=0.84) all
-  reliable; `VKS_Angle` is not** (circular r=0.44, p=0.15, n=19 paired) --
+  (ICC=0.93), `VKS_MinRad` (ICC=0.90), `VKS_MajRad` (ICC=0.87) all
+  reliable; `VKS_Angle` is not** (circular r=0.39, p=0.13, n=22 paired) --
   carried forward as an explicit caveat on the type/axis test rather than
   discovered after the fact, the exact mistake `ssvepBeh/` made once
   already.
@@ -195,7 +195,7 @@ Subject overlap is not a bottleneck for the main tests here either: all 43
 EEG subjects have FM100 data (checked in "Context" above). It *is* a
 bottleneck for checking whether the FM100-EEG relationship itself is
 stable across EEG sessions -- `docs/ssvepbeh_reliability_gaps.md`'s numbers
-apply unchanged here (pooled n=19 paired, HC n=13, PD n=4, protan n=2, CVD
+apply unchanged here (pooled n=21 paired, HC n=15, PD n=4, protan n=2, CVD
 n=2, **deutan n=0**), so M2 expects, going in, that a per-subtype
 reliability check won't be possible -- not a surprise to discover partway
 through, this time.

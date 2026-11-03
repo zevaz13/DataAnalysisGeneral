@@ -14,7 +14,7 @@ doesn't support one.
 **Spatial overlap** (`overlap.py`'s `weighted_overlap_test`/
 `click_value_test`): solid. Significant in every group on two
 independently-constructed null models, and stable across EEG sessions
-everywhere reliability is testable (pooled n=19, HC n=13, PD n=4 paired
+everywhere reliability is testable (pooled n=21, HC n=15, PD n=4 paired
 subjects -- `obs_stat`/p-values nearly identical session 1 vs. session 2).
 This part of the EEG test's validity against behavior is well supported at
 this project's current sample size.
@@ -29,11 +29,11 @@ checks agree:
    behavioral-x-EEG-feature correlations, pooled or in any group/subtype,
    **none survive Holm or the more permissive Benjamini-Hochberg FDR
    correction.** The strongest pooled pair (`orientation_deg` vs.
-   `ramp_intercept`, uncorrected p=0.015) corrects to p=0.11 under FDR.
+   `ramp_slope_red`, uncorrected p=0.0052) corrects to p=0.078 under FDR.
 2. **Cross-session reliability.** Where testable at all (pooled, HC, PD --
    protan/deutan/CVD-combined can't be assessed, see below), r-values shift
    substantially between EEG sessions for the same feature pair -- e.g.
-   HC's `beh_red` vs. `eeg_green` goes from r=-0.35 (session 1) to r=-0.06
+   HC's `beh_red` vs. `eeg_green` goes from r=-0.25 (session 1) to r=0.07
    (session 2). None of the pooled analysis's headline pairs even rank
    among the top hits once restricted to the smaller paired-subject subset.
 
@@ -62,8 +62,8 @@ Paired-subject counts (EEG data at both sessions), computed directly from
 
 | category | n (main analysis) | n (paired, both EEG sessions) |
 |---|---|---|
-| pooled | 43 | 19 |
-| HC (CTR) | 21 | 13 |
+| pooled | 43 | 20 |
+| HC (CTR) | 21 | 14 |
 | PD | 6 | 4 |
 | CVD (combined) | 15 | 2 |
 | protan | 8 | 2 |

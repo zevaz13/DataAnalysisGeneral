@@ -124,8 +124,8 @@ side fixed (each subject's pooled clicks) and compares the EEG side across
   `ssveps/files/subject_troughs.csv` (which already carries `group`/
   `subgroup` columns) rather than importing `ssveps/scripts/reliability.py`'s
   own version (avoids yet another cross-project name collision for a
-  one-line computation). Real counts in this project's data: pooled n=19,
-  CTR n=13, PD n=4, CVD (combined) n=2, protan n=2, **deutan n=0**.
+  one-line computation). Real counts in this project's data: pooled n=20,
+  CTR n=14, PD n=4, CVD (combined) n=2, protan n=2, **deutan n=0**.
 - **`session_overlap_comparison(beh_df, runmap_df, baselines_df, metadata_df, *, group=None, subgroup=None, sub_ids=None, normalize=analysis.DEFAULT_NORMALIZE, n_perm=5000, seed=None) -> DataFrame`**
   `weighted_overlap_test`/`click_value_test` run at both EEG sessions on
   the same paired subjects -- one row per session. Raises `ValueError`

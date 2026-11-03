@@ -1,6 +1,6 @@
 # SSVEP project plan
 
-Raw data: `/home/sebas/data/ssveps/` - 62 MATLAB files, 43 subjects.
+Raw data: `/home/sebas/data/ssveps/` - 72 MATLAB files, 50 subjects.
 `METxxx` is the subject id; the filename suffix gives the session
 (none = 1, `b` = 2, `c` = 3; no `c` files exist in this dataset).
 
@@ -97,9 +97,9 @@ db is a sensitivity check; z-score is not used for cross-group comparisons.
 Full reasoning in `docs/methods.md`.
 
 - [x] **M6 - Proposal 2: CVD gamut as a diagnostic.** `08_cvd_gamut.ipynb`.
-  `fitted_at_bound` as a CVD-vs-HC classifier (sensitivity 0.73, specificity
-  0.81, p=0.0019); `ramp_slope_red` established as the reusable per-subject
-  measure. Protan-vs-deutan not yet significant (p=0.44) at current n.
+  `fitted_at_bound` as a CVD-vs-HC classifier (sensitivity 0.76, specificity
+  0.79, p=0.0011); `ramp_slope_red` established as the reusable per-subject
+  measure. Protan-vs-deutan not yet significant (p=0.33) at current n.
   Method and full numbers: `docs/methods.md`; results: `docs/findings.md`
   section 3.
 - [x] **M7 - Proposal 3: variance decomposition.** `09_variance_components.ipynb`,
@@ -108,15 +108,15 @@ Full reasoning in `docs/methods.md`.
   (unexpected, flagged as a real finding to revisit). Method: `docs/methods.md`.
 - [x] **M8 - Proposal 4: gain vs. shape decomposition.** `10_gain_shape.ipynb`.
   `fit_gain_shape` per subject; protan shows a genuine trough-specific
-  residual beyond gain (p=0.030), PD/deutan don't. Method: `docs/methods.md`.
+  residual beyond gain (p=0.011, n=9), PD/deutan don't. Method: `docs/methods.md`.
 - [x] **M9 - Proposal 5: reliability-first outcome selection.**
   `11_reliability_outcomes.ipynb`. `ramp_slope_red`/`gain` are more reliable
-  (ICC 0.85/0.90) than `depth` (0.76) and now the recommended primary
+  (ICC 0.85/0.90) than `depth` (0.73) and now the recommended primary
   outcome for CVD/subtype work; `fitted_red` (ICC 0.18) ruled unusable.
   Recorded in `docs/methods.md`.
 - [x] **M10 - Proposal 7: joint (PCA) treatment of the 100-cell grid.**
-  `12_pca.ipynb`, `pca.py`. Only PC1 (75% of variance) clears the
-  permutation-based noise floor; PC1 tracks `gain`/`ramp_intercept` almost
+  `12_pca.ipynb`, `pca.py`. PC1 (74% of variance) and, narrowly, PC2
+  clear the permutation-based noise floor; PC1 tracks `gain`/`ramp_intercept` almost
   exactly (r=-0.93). Method: `docs/methods.md`.
 
 ## M6-M10: where this leaves things
@@ -157,13 +157,14 @@ recommendations, unchanged since M6:
 - [x] **`14_hc_vs_subtypes.ipynb`** -- same structure, three-way
   HC/protan/deutan, three pairwise `ramp_slope_red` comparisons
   (uncorrected, matching `beh/`'s own M1 convention). **HC vs protan
-  (p=0.0019) and HC vs deutan (p=0.048) significant; protan vs deutan is
-  not** (p=0.69) -- matches M6's earlier number on the same measure almost
-  exactly.
+  (p=0.0030) significant, HC vs deutan not (p=0.078, was 0.048 before
+  MET050-052); protan vs deutan is not** (p=0.48) -- matches M6's
+  Mann-Whitney number on the same measure.
 - [x] **`15_permutation_stability.ipynb`** -- protan vs deutan, all three
   `permutation_test_*` variants, 200 independent seeds each. **A
-  corrected-significant cluster is found in 173-196 of 200 seeds
-  (86.5%-98%)** -- a stable, seed-robust result, not a fluke.
+  corrected-significant cluster was found in 173-196 of 200 seeds
+  (86.5%-98%) at 7 deutan; with MET048 (and later MET049) it is 0 of 200
+  for all three variants -- see `docs/findings.md`.**
   **Unexpected finding, not what this item set out to check:** this
   contradicts the project's working narrative that protan-vs-deutan "isn't
   significant yet" (M6's `ramp_slope_red` p=0.44, M10's PCA PC1 p=0.092).
@@ -197,9 +198,9 @@ recommendations, unchanged since M6:
 - [x] **CVD gamut analysis, explained** -- answered directly in
   conversation (not a doc section): `fit_ramp_gaussian` fits a ramp with a
   dip; for most CVD subjects the dip's best fit wants to sit beyond the
-  sampled red range and pegs at the boundary instead (`at_bound=True`, 11/15
-  CVD vs 4/21 CTR at session 1). M6 uses that peg/no-peg split itself as the
-  CVD-vs-HC classifier (73%/81% sensitivity/specificity, p=0.0019), and
+  sampled red range and pegs at the boundary instead (`at_bound=True`, 13/17
+  CVD vs 5/24 CTR at session 1). M6 uses that peg/no-peg split itself as the
+  CVD-vs-HC classifier (76%/79% sensitivity/specificity, p=0.0011), and
   introduces `ramp_slope_red` (ramp only, no dip, always defined) as the
   usable severity measure for subjects whose dip can't be located.
   `extrapolate_ramp_crossing` is a separate, explicitly unstable attempt to
