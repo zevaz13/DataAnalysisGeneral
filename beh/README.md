@@ -141,8 +141,8 @@ Each opens with `sys.path.append('../scripts')`, so run them with
   pairings).
 - `04_reliability.ipynb` -- M4: cross-session ICC/circular-r for centroid
   and shape features, HC and PD only (CVD mostly lacks a second session).
-  HC is mostly not reliable session-to-session (only `centroid_green`
-  clears significance); PD (n=6) has no significant feature either, at a
+  HC is only partly reliable session-to-session (`centroid_green` clearly;
+  `centroid_red`, `along_var`, `orientation_deg` only narrowly and uncorrected); PD (n=6) has no significant feature either, at a
   sample size too small to confirm the suggestively high `along_var`/
   `orientation_deg` point estimates.
 - `05_hc_vs_pd.ipynb` -- M4: point clouds, Hotelling T², per-feature shape

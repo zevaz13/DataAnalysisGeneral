@@ -335,9 +335,11 @@ in how far clicks stretch along the line is the largest as well).
 Three more notebooks tested how far that story holds up.
 `04_reliability.ipynb` asked whether it's stable session-to-session (HC and
 PD only -- CVD is excluded, most protan/deutan subjects have just one
-session). For HC, mostly not: of centroid location and the three M2 shape
-features, only `centroid_green` clears significance (ICC=0.63, p=0.0003);
-`orientation_deg`, `along_var`, `perp_var`, and `centroid_red` don't. That
+session). For HC, only partly: of centroid location and the three M2 shape
+features, `centroid_green` is clearly reliable (ICC=0.63, p=0.0003, n=24
+paired); `centroid_red`, `along_var` and `orientation_deg` clear 0.05 only
+narrowly and uncorrected (p=0.02-0.04, none survives a correction for five
+tests), and `perp_var` is not reliable (p=0.20). That
 doesn't undercut M2's headline result -- that used clicks pooled across a
 subject's sessions, a more forgiving question -- but it's a real caveat
 before trusting any single session's numbers on their own. `05_hc_vs_pd.ipynb`
@@ -519,7 +521,8 @@ fact.
 Pooled across everyone (n=54), FM100 error magnitude and your behavioral
 spread line up strongly (r=0.72, p=0.0002 -- about as strong a relationship
 as this project has found anywhere). But split apart by group, that relationship doesn't hold up on
-its own within any single group at our current sample sizes -- most likely
+its own within HC, CVD, PD or deutan at our current sample sizes (protan
+alone reaches p=0.037 on 9 subjects, one uncorrected test of six) -- most likely
 because it's substantially "sicker people score worse on both tests,"
 which we already knew, rather than a fine-grained continuum. Not
 disproven, just not yet confirmed -- worth revisiting once we have more

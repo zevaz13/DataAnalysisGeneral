@@ -115,7 +115,7 @@ Full reasoning in `docs/methods.md`.
   outcome for CVD/subtype work; `fitted_red` (ICC 0.18) ruled unusable.
   Recorded in `docs/methods.md`.
 - [x] **M10 - Proposal 7: joint (PCA) treatment of the 100-cell grid.**
-  `12_pca.ipynb`, `pca.py`. PC1 (74% of variance) and, narrowly, PC2
+  `12_pca.ipynb`, `pca.py`. PC1 (73% of variance) and, narrowly, PC2
   clear the permutation-based noise floor; PC1 tracks `gain`/`ramp_intercept` almost
   exactly (r=-0.93). Method: `docs/methods.md`.
 

@@ -285,9 +285,10 @@ Each opens with `sys.path.append('../scripts')`, so run them with
 - **`04_reliability.ipynb`** -- M4: `retest.reliability_table` for HC and
   PD (CVD excluded -- most subjects lack a second session), plotted via
   `ssvep_beh_fm100/scripts/plotting.py`'s `plot_reliability_table` (reused
-  cross-project, no new chart code). HC is mostly not reliable
-  session-to-session (only `centroid_green` clears significance, ICC=0.60,
-  p=0.0013); PD (n=6) has nothing significant either, at a sample size too
+  cross-project, no new chart code). HC is only partly reliable
+  session-to-session (`centroid_green` clearly, ICC=0.63, p=0.0003, n=24;
+  `centroid_red`, `along_var`, `orientation_deg` narrowly and uncorrected,
+  `perp_var` not at all); PD (n=6) has nothing significant either, at a sample size too
   small to confirm its own suggestively high point estimates. *Edit:*
   `group=`/`subgroup=` on the `reliability_table` calls for a different
   category (will raise below 3 paired subjects).

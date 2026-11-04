@@ -42,12 +42,13 @@ far. See `docs/findings.md` section 2.
 ### M4. Reliability, HC vs PD, outlier ellipse
 
 - [x] **`04_reliability.ipynb`** -- cross-session ICC/circular-r for
-  centroid + M2 shape features, HC and PD only (CVD excluded: 6/7 deutan
-  and 6/8 protan have only 1 session). New `beh/scripts/retest.py`, reusing
+  centroid + M2 shape features, HC and PD only (CVD excluded: 7/8 deutan
+  and 7/9 protan have only 1 session). New `beh/scripts/retest.py`, reusing
   `ssveps/scripts/reliability.py`'s `feature_icc` directly.
-  **HC (n=23 paired) is mostly not reliable session-to-session** -- only
-  `centroid_green` clears significance (ICC=0.59, p=0.0012); `centroid_red`,
-  `along_var`, `perp_var`, `orientation_deg` all non-significant. **PD
+  **HC (n=24 paired) is only partly reliable session-to-session** --
+  `centroid_green` clearly (ICC=0.63, p=0.0003); `centroid_red` (p=0.031),
+  `along_var` (p=0.022) and `orientation_deg` (p=0.040) only narrowly and
+  uncorrected, `perp_var` not at all (p=0.20). **PD
   (n=6) has nothing significant either**, though `along_var`
   (ICC=0.58)/`orientation_deg` (circular r=0.76) are suggestively high at a
   sample size too small to confirm it. Doesn't contradict M2's headline

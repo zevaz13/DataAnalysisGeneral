@@ -2,8 +2,8 @@
 features (M4, PLANbeh.md).
 
 CVD is excluded at the call site (not enforced here) -- most CVD subjects
-have only 1 session (6/7 deutan, 6/8 protan), too few for a per-subgroup
-reliability check; HC (21/23 with 2+ sessions) and PD (6/8) are usable.
+have only 1 session (7/8 deutan, 7/9 protan), too few for a per-subgroup
+reliability check; HC (24/28 with 2+ sessions) and PD (6/8) are usable.
 
 orientation_deg is periodic (folds to [0, 180), same as
 ssvep_beh_fm100/scripts/fm100_features.py's VKS_Angle) -- a naive linear ICC

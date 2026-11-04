@@ -419,12 +419,12 @@ permutation-testing idea `permutation.py` (M3) and the bootstrap CIs (M6,
 M7) already use elsewhere in this project, rather than introducing a new
 paradigm for one milestone.
 
-**Real-data finding.** PC1 alone explains 74% of the variance. At n=49,
-PC2 also clears the permutation noise floor, narrowly (observed ratio 6.1%
-vs. a null threshold of 5.7%), giving two trustworthy components -- within
+**Real-data finding.** PC1 alone explains 73% of the variance. At n=51,
+PC2 also clears the permutation noise floor, narrowly (observed ratio 6.4%
+vs. a null threshold of 5.6%), giving two trustworthy components -- within
 proposal 7's own expectation of "two or three". At n=43 only PC1 cleared it
 (PC2's ratio, 5.4%, sat just below its threshold, 6.1%), so PC2's status is
-sample-size sensitive. PC3 (4.3% vs. 5.3%) is not distinguishable from what
+sample-size sensitive. PC3 (4.3% vs. 5.2%) is not distinguishable from what
 100 correlated-but-otherwise-unstructured cells would produce by chance.
 
 **PC1 is the gain axis, found a third independent way.** PC1's loading is
