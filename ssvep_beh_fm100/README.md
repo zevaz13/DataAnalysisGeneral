@@ -139,8 +139,8 @@ regression tests.
   subjects).
 - `04_fm100_vs_eeg.ipynb` -- M2b: the same two tests against EEG, reusing
   `severity.py`/`type_axis.py` unchanged. **Severity**: significant pooled
-  (r=0.49, p=0.027) but weaker than the behavioral version, and doesn't
-  hold up per-group. **Type/axis**: significant pooled (r=-0.31, p=0.032);
+  (r=0.48, p=0.027) but weaker than the behavioral version, and doesn't
+  hold up per-group. **Type/axis**: significant pooled (r=-0.31, p=0.031);
   per-group, only `deutan` (n=8, r=0.63, p=0.028) reaches significance --
   a lead, not a confirmed finding at that n, weaker than M1's within-CVD
   result. Both EEG results are weaker than their behavioral counterparts,

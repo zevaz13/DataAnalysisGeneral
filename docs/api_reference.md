@@ -696,7 +696,7 @@ edit the variables called out below and rerun from that cell down.
   whether a group's deficit is a uniform gain change or something
   trough-specific; a cross-check of `gain` against `ramp_intercept` (M6) and
   `trough_region_residual` against `fitted_amp` (M4/M6). Currently protan
-  shows a genuine trough-specific residual beyond gain (p=0.030, n=8, one
+  shows a genuine trough-specific residual beyond gain (p=0.007, n=9, one
   test, uncorrected) that PD and deutan don't -- ties together with M6's
   `ramp_slope_red` finding that protan's trough sits furthest beyond the
   sampled range. *Edit:* `SESSION` (top cell); swap `group='CTR'` in the

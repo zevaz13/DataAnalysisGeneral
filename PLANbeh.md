@@ -55,15 +55,16 @@ far. See `docs/findings.md` section 2.
   subject's sessions, a different and more forgiving question) but is a
   real caveat worth carrying forward before treating any single session's
   features as individually trustworthy.
-- [x] **`05_hc_vs_pd.ipynb`** -- point clouds, Hotelling T² (p=0.0001,
+- [x] **`05_hc_vs_pd.ipynb`** -- point clouds, Hotelling T² (p=0.0004,
   matches M1's number), all three shape features (all significant for this
-  pair: orientation_deg p=0.006, along_var p=0.034, perp_var p=0.030), plus
+  pair: orientation_deg p=0.006, along_var p=0.049, perp_var p=0.036), plus
   a new PD-specific check: `features.within_session_scatter` (click
-  consistency within one sitting). **PD is significantly less consistent
-  within a session** (Mann-Whitney p=0.023, ~70% larger RMS scatter than
-  HC, 552 vs 320) -- a specific, confirmed answer to whether PD's motor
-  symptoms show up as noisier clicking rather than (or alongside) a shifted
-  match point.
+  consistency within one sitting). PD shows ~70% larger
+  RMS scatter than HC within a session (552 vs 323), but **no longer
+  significantly so** (Mann-Whitney p=0.053 at HC n=28; it was p=0.023 before
+  MET050-MET054 joined) -- suggestive, not a confirmed answer to whether PD's
+  motor symptoms show up as noisier clicking rather than (or alongside) a
+  shifted match point.
 - [x] **`06_outlier_rejection.ipynb`** -- new outlier-ellipse machinery in
   `features.py` (`outlier_mask`, `subject_outliers`, `group_outliers`) and
   `plotting.py` (`plot_subject_outliers`/`plot_subjects_outliers_grid`,

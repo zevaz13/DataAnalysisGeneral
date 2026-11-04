@@ -1,6 +1,6 @@
 # SSVEP project: work-to-date summary and code review
 
-**Section 1 is kept current** (last updated after MET051b and MET053 joined, 2026-11-02). **Section 2 is a
+**Section 1 is kept current** (last updated after MET054 joined, 2026-11-04). **Section 2 is a
 dated code review specifically of the M1-M5 code** (the axis-swap fix, the
 test suite, the permutation subsampling fix, and related findings) -- it was
 not repeated for M6-M10, whose own design decisions and rationale live in
@@ -13,7 +13,7 @@ per-milestone rationale), `api_reference.md` (per-function signatures),
 
 ### Data pipeline
 
-Raw: 72 `.mat` files in `/home/sebas/data/ssveps/`, 50 unique subjects, sessions
+Raw: 73 `.mat` files in `/home/sebas/data/ssveps/`, 51 unique subjects, sessions
 1-2 (no session 3 in this dataset). Read in place, never copied into the repo.
 
 | Script | Role |
@@ -70,20 +70,20 @@ aren't already familiar (see `ssveps/README.md`).
 
 ### Headline results so far
 
-- Group trough is broad and flat; CTR (n=25, session 1) minimum sits at
+- Group trough is broad and flat; CTR (n=26, session 1) minimum sits at
   red 2133 / green 889, matching the independent reference image.
 - Permutation testing (session 1 vs HC, after the 2.3 fix): PD shows no
-  cluster; protan has a cluster at p=0.012 and deutan one at p=0.014. The
+  cluster; protan has a cluster at p=0.013 and deutan one at p=0.013. The
   protan-vs-deutan cluster test finds nothing (0 of 200 seeds).
 - Test-retest ICC: 0.78 across the whole grid (n=22 paired), 0.80 for CTR
   (n=16), 0.42 for PD (n=4, too thin to trust). CVD subgroups have too few
   paired subjects to run at all.
 - **CVD vs. CTR is the one well-powered effect in the dataset** (M6):
-  76%/76% sensitivity/specificity (13/17, 19/25) on whether a subject's
-  trough fit pegs at the sampled range boundary (Fisher exact p=0.0014). The protan-vs-deutan
+  76%/77% sensitivity/specificity (13/17, 20/26) on whether a subject's
+  trough fit pegs at the sampled range boundary (Fisher exact p=0.0013). The protan-vs-deutan
   subtype question has two hints -- shallower `ramp_slope_red` for protan
   (M6, p=0.33 vs deutan) and a trough-specific residual beyond gain for
-  protan alone (M8, p=0.008 uncorrected, n=9) -- while the PC1 split (M10,
+  protan alone (M8, p=0.007 uncorrected, n=9) -- while the PC1 split (M10,
   p=0.61) no longer points anywhere. None distinguishes protan from deutan
   at n=9 vs 8.
 - **PD's higher variability is about the people, not the measurement** (M7):
@@ -97,7 +97,7 @@ aren't already familiar (see `ssveps/README.md`).
   functionally unusable at this project's sample sizes.
 - **PCA confirms "gain" as the dominant real axis** (M10) three independent
   ways (PC1 vs `ramp_intercept` r=-0.93, `gain` vs `ramp_intercept`
-  r=0.86), and at n=50 two components clear the permutation-based noise
+  r=0.86), and at n=51 two components clear the permutation-based noise
   floor (only PC1 did at n=43).
 - The standing experimental recommendation since M6, unchanged: extend the
   red stimulus axis, and collect more PD/protan/deutan subjects. See

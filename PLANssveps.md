@@ -1,6 +1,6 @@
 # SSVEP project plan
 
-Raw data: `/home/sebas/data/ssveps/` - 72 MATLAB files, 50 subjects.
+Raw data: `/home/sebas/data/ssveps/` - 73 MATLAB files, 51 subjects.
 `METxxx` is the subject id; the filename suffix gives the session
 (none = 1, `b` = 2, `c` = 3; no `c` files exist in this dataset).
 
@@ -98,7 +98,7 @@ Full reasoning in `docs/methods.md`.
 
 - [x] **M6 - Proposal 2: CVD gamut as a diagnostic.** `08_cvd_gamut.ipynb`.
   `fitted_at_bound` as a CVD-vs-HC classifier (sensitivity 0.76, specificity
-  0.79, p=0.0011); `ramp_slope_red` established as the reusable per-subject
+  0.77, p=0.0013); `ramp_slope_red` established as the reusable per-subject
   measure. Protan-vs-deutan not yet significant (p=0.33) at current n.
   Method and full numbers: `docs/methods.md`; results: `docs/findings.md`
   section 3.
@@ -108,7 +108,7 @@ Full reasoning in `docs/methods.md`.
   (unexpected, flagged as a real finding to revisit). Method: `docs/methods.md`.
 - [x] **M8 - Proposal 4: gain vs. shape decomposition.** `10_gain_shape.ipynb`.
   `fit_gain_shape` per subject; protan shows a genuine trough-specific
-  residual beyond gain (p=0.011, n=9), PD/deutan don't. Method: `docs/methods.md`.
+  residual beyond gain (p=0.007, n=9), PD/deutan don't. Method: `docs/methods.md`.
 - [x] **M9 - Proposal 5: reliability-first outcome selection.**
   `11_reliability_outcomes.ipynb`. `ramp_slope_red`/`gain` are more reliable
   (ICC 0.85/0.90) than `depth` (0.73) and now the recommended primary
@@ -157,8 +157,8 @@ recommendations, unchanged since M6:
 - [x] **`14_hc_vs_subtypes.ipynb`** -- same structure, three-way
   HC/protan/deutan, three pairwise `ramp_slope_red` comparisons
   (uncorrected, matching `beh/`'s own M1 convention). **HC vs protan
-  (p=0.0030) significant, HC vs deutan not (p=0.078, was 0.048 before
-  MET050-052); protan vs deutan is not** (p=0.48) -- matches M6's
+  (p=0.0021) significant, HC vs deutan not (p=0.064, was 0.048 before
+  MET050-054); protan vs deutan is not** (p=0.48) -- matches M6's
   Mann-Whitney number on the same measure.
 - [x] **`15_permutation_stability.ipynb`** -- protan vs deutan, all three
   `permutation_test_*` variants, 200 independent seeds each. **A
@@ -199,8 +199,8 @@ recommendations, unchanged since M6:
   conversation (not a doc section): `fit_ramp_gaussian` fits a ramp with a
   dip; for most CVD subjects the dip's best fit wants to sit beyond the
   sampled red range and pegs at the boundary instead (`at_bound=True`, 13/17
-  CVD vs 5/24 CTR at session 1). M6 uses that peg/no-peg split itself as the
-  CVD-vs-HC classifier (76%/79% sensitivity/specificity, p=0.0011), and
+  CVD vs 6/26 CTR at session 1). M6 uses that peg/no-peg split itself as the
+  CVD-vs-HC classifier (76%/77% sensitivity/specificity, p=0.0013), and
   introduces `ramp_slope_red` (ramp only, no dip, always defined) as the
   usable severity measure for subjects whose dip can't be located.
   `extrapolate_ramp_crossing` is a separate, explicitly unstable attempt to

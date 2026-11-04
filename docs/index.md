@@ -63,7 +63,7 @@ Raw: `/home/sebas/data/manualTest/behavioral_table.csv`. Docs: `README.md`,
 | `06_outlier_rejection.ipynb` | Ellipse-based outlier detection, per-subject and per-group |
 
 ### `ssveps/` -- SSVEP (EEG) grid task
-Raw: `/home/sebas/data/ssveps/` (72 `.mat` files, 50 subjects). Docs:
+Raw: `/home/sebas/data/ssveps/` (73 `.mat` files, 51 subjects). Docs:
 `README.md`, `../PLANssveps.md`, `docs/methods.md`, `docs/api_reference.md`,
 `docs/ssvep_analyses.md`, `docs/ssvep_summary.md`, `docs/findings.md`
 section 3.

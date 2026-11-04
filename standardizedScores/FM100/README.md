@@ -137,15 +137,15 @@ Each opens with `sys.path.append('../scripts')`, so run them with
 - `03_flagged_subjects.ipynb` -- M2: linear and radial (both `label_mode`s)
   plots for MET020, MET047, MET021 individually, then together.
 - `04_hc_vs_pd.ipynb` -- M2: HC vs PD profiles and the DC-offset question.
-  `estimate_offset`: offset=0.96 (bootstrap 95% CI [0.22, 1.74], p=0.009 --
+  `estimate_offset`: offset=0.94 (bootstrap 95% CI [0.22, 1.72], p=0.011 --
   a real, non-zero constant), but R2=0.54 -- the constant explains only
   about half of PD's own cap-to-cap shape relative to HC's, so "PD = HC + a
   number" is a real but partial description, not the whole story. Plus its
   M3 addition: Holm-corrected, this pair's per-feature battery has nothing
-  survive (smallest corrected p is 0.089).
+  survive (smallest corrected p is 0.083).
 - `05_outlier_flagging.ipynb` -- M3: `plot_feature_boxplots_grid` across
   CTR/PD/protan/deutan for all 6 `FEATURES`; `subject_feature_outliers`
-  finds two CTR subjects (MET020, already flagged elsewhere in this
-  project, and MET050) outliers on a majority of features; rerunning
-  `estimate_offset` with them dropped barely moves the offset (0.96 -> 1.07)
-  or its R2 (0.54 -> 0.49) -- the offset pattern isn't riding on one subject.
+  finds three CTR subjects (MET020, already flagged elsewhere in this
+  project, and MET050 and MET051) outliers on a majority of features; rerunning
+  `estimate_offset` with them dropped barely moves the offset (0.94 -> 1.07)
+  or its R2 (0.54 -> 0.48) -- the offset pattern isn't riding on one subject.

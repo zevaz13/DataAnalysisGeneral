@@ -38,8 +38,8 @@ def df():
 
 def test_load_behavioral_has_expected_shape_and_columns(df):
     assert list(df.columns) == ["sub_id", "session", "click", "red", "green", "group", "subgroup", "date", "folder"]
-    assert len(df) == 1772
-    assert df["sub_id"].nunique() == 53
+    assert len(df) == 1792
+    assert df["sub_id"].nunique() == 54
 
 
 def test_part_type_maps_to_group_matching_ssveps_metadata(df):
@@ -52,7 +52,7 @@ def test_part_type_maps_to_group_matching_ssveps_metadata(df):
         if sub_id in overlap.index:
             assert group == overlap[sub_id]
             checked += 1
-    assert checked == 49  # every ssveps-known subject in this dataset
+    assert checked == 50  # every ssveps-known subject in this dataset
 
 
 def test_subgroup_is_populated_for_every_cvd_subject(df):
@@ -71,7 +71,7 @@ def test_subgroup_is_na_for_subjects_missing_from_ssvep_metadata(df):
 def test_subjects_in_group_filters_correctly(df):
     protan = loader.subjects_in_group(df, subgroup="protan")
     assert set(protan) == set(df.loc[df["subgroup"] == "protan", "sub_id"].unique())
-    assert len(loader.subjects_in_group(df)) == 53
+    assert len(loader.subjects_in_group(df)) == 54
 
 
 # --- comparisons (Hotelling T^2) ----------------------------------------
