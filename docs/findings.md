@@ -191,6 +191,54 @@ Dropping all three moves the FM100 offset from 0.94 to 1.07 (R² 0.54 to
 0.48), so "PD = HC + a number" still does not depend on a few unusual
 controls.
 
+## What changed when MET053 added a second session (MET053b)
+
+Re-run on 2026-11-09 after adding the second session of **MET053** (healthy
+control): its EEG grid, 21 manual (behavioral) presses, FM100 and blue/red
+linear test. No new subject, so every group `n` stays put: HC is still n=26 at
+EEG/FM100 session 1 and n=28 behaviorally. What changes is session 2 --
+23 subjects now have two EEG sessions (17 of them HC), 24 have two FM100
+sessions, and HC has 25 subjects with two behavioral sessions. The "before"
+column is the state after MET054 (the section above).
+
+| Result | Before (after MET054) | Now, with MET053b |
+|---|---|---|
+| Behavioral, HC vs PD, `along_var` (uncorrected) | p=0.049 | **p=0.053** |
+| Behavioral, HC vs PD, mean click location (Hotelling) | p=0.0004 | p=0.0004 |
+| Behavioral, PD vs HC within-session scatter (Mann-Whitney) | p=0.053 (552 vs 323) | p=0.053 (552 vs 323) |
+| Behavioral, HC session-to-session `centroid_green` ICC | 0.63 (p=0.0003, n=24) | 0.64 (p=0.0002, n=25) |
+| EEG, test-retest ICC: `ramp_slope_red` / `gain` / trough `depth` | 0.85 / 0.89 / 0.73 (n=22) | 0.86 / 0.89 / 0.73 (n=23) |
+| FM100, test-retest `VKS_Angle` circular r | 0.39 (p=0.12, n=23) | 0.34 (p=0.16, n=24) |
+| FM100, HC vs PD offset (95% CI, p, R²) | 0.94 ([0.22, 1.72], p=0.011, 0.54) | 0.93 ([0.20, 1.72], p=0.011, 0.54) |
+| FM100, outlier-flagged controls | MET020, MET050, MET051 | MET020, MET050 |
+| FM100, offset after dropping flagged controls (R²) | 1.07 (0.48) | 1.03 (0.50) |
+| FM100 vs behavioral, severity (pooled) | r=0.72, p=0.0002 (n=54) | r=0.71, p=0.0002 (n=54) |
+| FM100 vs behavioral, type/axis (pooled) | r=0.40, p=0.0033 (n=54) | r=0.40, p=0.0029 (n=54) |
+| FM100 vs EEG, severity (pooled) | r=0.48, p=0.027 (n=51) | r=0.48, p=0.026 (n=51) |
+| FM100 vs EEG, type/axis (pooled) | r=-0.31, p=0.031 (n=51) | r=-0.32, p=0.026 (n=51) |
+| Clicks vs EEG, type/axis (pooled) | r=-0.24, p=0.094 (n=50) | r=-0.24, p=0.090 (n=50) |
+| Three-way joint concordance (FM100, clicks, EEG) | p=0.0012 | p=0.0012 |
+
+**One result crosses the line, in the "less significant" direction.** HC vs PD
+`along_var` moved from p=0.049 to p=0.053, so of the three click-shape
+features only `orientation_deg` (p=0.011) and `perp_var` (p=0.036) now
+separate HC from PD; `along_var` was already described as borderline. Nothing
+else changes status. Everything cross-sectional (session 1 EEG, every group
+comparison, the protan/deutan cluster, PC1, the CVD-vs-control classifier,
+the behavioral orientation separation) is untouched by construction, since
+the new data is a second session of a subject already counted. The only
+movements are in reliability (the extra HC pair nudges the EEG `ramp_slope_red`
+and behavioral `centroid_green` ICCs up slightly and lowers FM100
+`VKS_Angle`'s, which was already not significant) and in the pooled
+FM100 correlations, which all drift by a hundredth or two in r.
+
+A new fact about the controls: **MET051 is no longer flagged by the FM100
+outlier rule** (Tukey outlier on 1 feature now, against 4 before). Nothing
+about MET051's own scores changed -- the fences come from the whole control
+group, and MET053's second session shifted them just enough. Only MET020 and
+MET050 remain flagged, and dropping them leaves the offset at 1.03 (R² 0.50),
+so "PD = HC + a number" still does not depend on a few unusual controls.
+
 ## The shape of the project
 
 Several ways of looking at the same underlying question -- does someone
@@ -260,22 +308,22 @@ by side, in both plot styles, for a closer look at the flagged pair.
 `04_hc_vs_pd.ipynb` asked a sharper question: is PD's FM100 profile just
 HC's, shifted by a constant? Every magnitude feature differs from HC
 (TES p=0.028, PES red-green p=0.014, PES blue-yellow p=0.032, both VKS
-radii p<0.04) but `VKS_Angle` doesn't (p=0.94) -- PD's error is bigger, not
+radii p<0.04) but `VKS_Angle` doesn't (p=0.98) -- PD's error is bigger, not
 differently-directed, the same magnitude-not-direction pattern
 `02_group_comparisons.ipynb` already found. There genuinely is a real,
-non-zero offset (c=0.94, 95% CI [0.22, 1.72], p=0.011) -- but it only
+non-zero offset (c=0.93, 95% CI [0.20, 1.72], p=0.011) -- but it only
 explains about half of PD's shape (R²=0.54), so "PD = HC + a number" is a
 real partial description, not the whole story.
 
 Two more checks (M3) sharpened both of those: correcting the per-feature
 comparisons for testing 6 features at once (Holm) is a real, not just
 procedural, tightening -- **CTR vs PD loses every feature** (smallest
-corrected p is 0.083) and protan vs deutan still has nothing, though HC vs
+corrected p is 0.14) and protan vs deutan still has nothing, though HC vs
 protan and HC vs deutan both keep 11 of their significant rows. And the
-offset finding survives a direct stress test: only three CTR subjects
-(MET020, already flagged elsewhere in this section, and MET050 and MET051,
-who joined later) are outliers on most of the 6 features, and dropping them
-barely moves the offset (0.94 to 1.07) or its R² (0.54 to 0.48) -- "PD = HC + a
+offset finding survives a direct stress test: only two CTR subjects
+(MET020, already flagged elsewhere in this section, and MET050, who joined
+later) are outliers on most of the 6 features, and dropping them
+barely moves the offset (0.93 to 1.03) or its R² (0.54 to 0.50) -- "PD = HC + a
 number" isn't riding on a couple of unusual controls.
 
 ## 2. Behavioral: what your own clicks say
@@ -336,16 +384,16 @@ Three more notebooks tested how far that story holds up.
 `04_reliability.ipynb` asked whether it's stable session-to-session (HC and
 PD only -- CVD is excluded, most protan/deutan subjects have just one
 session). For HC, only partly: of centroid location and the three M2 shape
-features, `centroid_green` is clearly reliable (ICC=0.63, p=0.0003, n=24
+features, `centroid_green` is clearly reliable (ICC=0.64, p=0.0002, n=25
 paired); `centroid_red`, `along_var` and `orientation_deg` clear 0.05 only
-narrowly and uncorrected (p=0.02-0.04, none survives a correction for five
-tests), and `perp_var` is not reliable (p=0.20). That
+narrowly and uncorrected (p=0.01-0.04, none survives a correction for five
+tests), and `perp_var` is not reliable (p=0.19). That
 doesn't undercut M2's headline result -- that used clicks pooled across a
 subject's sessions, a more forgiving question -- but it's a real caveat
 before trusting any single session's numbers on their own. `05_hc_vs_pd.ipynb`
 reran the M1 comparison on HC vs PD specifically (Hotelling p=0.0004,
-matching M1; all three shape features individually significant too,
-`along_var` only just, p=0.049 uncorrected) and
+matching M1; `orientation_deg` (p=0.011) and `perp_var` (p=0.036)
+individually significant too, `along_var` no longer, p=0.053) and
 found something that has since weakened: PD subjects looked significantly
 less consistent within a single sitting (Mann-Whitney p=0.023 originally),
 and still show ~70% more within-session click scatter than HC (median 552
@@ -387,7 +435,7 @@ trough also runs off the grid, and 73%/p=0.0019 before MET048).
 - **Reliability matters, and it changed our recommendations.** When we
   checked which EEG measures are actually consistent test-to-retest, the
   ramp slope and overall gain of a subject's response turned out to be
-  *more* trustworthy (ICC 0.85-0.89) than the measure we'd started with,
+  *more* trustworthy (ICC 0.86-0.89) than the measure we'd started with,
   trough depth (0.73) -- and one early candidate measure was so unreliable
   (ICC 0.20) it's not usable at all. Good news buried in this: this is
   exactly the kind of check that keeps us from building a clinical claim on
@@ -514,12 +562,12 @@ consistency before leaning on either.
 **FM100's severity features are trustworthy; its direction feature is
 shakier.** Total error and the confusion-ellipse's size are highly
 consistent session-to-session. Which *way* that ellipse points is not
-(circular r=0.39, not significant) -- worth knowing going in, not discovering after the
+(circular r=0.34, not significant) -- worth knowing going in, not discovering after the
 fact.
 
 **Severity: a strong signal, but likely a between-group one for now.**
 Pooled across everyone (n=54), FM100 error magnitude and your behavioral
-spread line up strongly (r=0.72, p=0.0002 -- about as strong a relationship
+spread line up strongly (r=0.71, p=0.0002 -- about as strong a relationship
 as this project has found anywhere). But split apart by group, that relationship doesn't hold up on
 its own within HC, CVD, PD or deutan at our current sample sizes (protan
 alone reaches p=0.037 on 9 subjects, one uncorrected test of six) -- most likely
@@ -530,7 +578,7 @@ participants per group.
 
 **Type/axis: the more exciting result.** FM100's confusion-ellipse
 direction and your click-line orientation line up significantly overall
-(r=0.40, p=0.0033, n=54), *and* that relationship holds up within the CVD
+(r=0.40, p=0.0029, n=54), *and* that relationship holds up within the CVD
 group on its own (r=0.54, p=0.031, n=17) -- not
 just because CVD and healthy participants differ, but because CVD
 participants who differ from each other in one measure tend to differ from
@@ -549,10 +597,10 @@ ones, just weaker** -- which is itself a consistent, sensible pattern: EEG
 has been the noisier, more indirect measure everywhere else in this
 project too.
 
-- **Severity** lines up significantly overall (r=0.48, p=0.027, n=51), but
+- **Severity** lines up significantly overall (r=0.48, p=0.026, n=51), but
   more weakly than with behavioral data, and (same as before) doesn't hold up
   within any single group at our current sample sizes.
-- **Type/axis** also lines up significantly overall (p=0.031, n=51). Within
+- **Type/axis** also lines up significantly overall (r=-0.32, p=0.026, n=51). Within
   groups, only deutan shows a significant relationship (r=0.63, p=0.028,
   n=8) -- it held up when MET048 joined (it was p=0.034 at n=7) and again
   when MET049 (protan) joined, which is encouraging, but at that size it's
@@ -579,7 +627,7 @@ then asked the more interesting question it sets up: do all three agree
 individual pairings comes up empty?
 
 **The third pairing (clicks vs. EEG) doesn't hold up on its own** -- no
-real relationship there in isolation (p=0.094, n=50). That could have been a
+real relationship there in isolation (p=0.090, n=50). That could have been a
 discouraging result. **But testing all three together anyway, as one combined
 question, found a real signal** (p=0.0012) -- FM100, your clicks, and the EEG
 do share structure as a group, even though one of the three ways of pairing
@@ -651,7 +699,9 @@ not a settled finding yet).
   The six healthy-control sessions added since (MET050-MET054) show the third
   pattern: no single participant mattered, but together they nudged two
   marginal results (HC vs deutan in the EEG, PD's within-session scatter in
-  the clicks) back above p=0.05.
+  the clicks) back above p=0.05. MET053's second session, a repeat of an
+  existing control, did the same to one more (HC vs PD `along_var`, p=0.049
+  to 0.053) and otherwise only touched reliability numbers.
 
 ## Come play
 
