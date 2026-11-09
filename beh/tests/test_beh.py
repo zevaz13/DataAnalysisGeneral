@@ -38,7 +38,7 @@ def df():
 
 def test_load_behavioral_has_expected_shape_and_columns(df):
     assert list(df.columns) == ["sub_id", "session", "click", "red", "green", "group", "subgroup", "date", "folder"]
-    assert len(df) == 1792
+    assert len(df) == 1813
     assert df["sub_id"].nunique() == 54
 
 

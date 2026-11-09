@@ -1,6 +1,6 @@
 # SSVEP project plan
 
-Raw data: `/home/sebas/data/ssveps/` - 73 MATLAB files, 51 subjects.
+Raw data: `/home/sebas/data/ssveps/` - 74 MATLAB files, 51 subjects.
 `METxxx` is the subject id; the filename suffix gives the session
 (none = 1, `b` = 2, `c` = 3; no `c` files exist in this dataset).
 

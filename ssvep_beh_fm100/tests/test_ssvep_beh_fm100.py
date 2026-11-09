@@ -134,7 +134,7 @@ def test_circ_mean_deg_axial_stays_put_for_a_tight_cluster():
 
 def test_paired_sessions_matches_known_count(fm100_df):
     paired = fm100_features.paired_sessions(fm100_df)
-    assert len(paired) == 23
+    assert len(paired) == 24
     assert {"TES_session1", "TES_session2", "VKS_Angle_session1", "VKS_Angle_session2"}.issubset(paired.columns)
 
 
@@ -149,7 +149,7 @@ def test_reliability_table_uses_icc_for_magnitude_features_and_circ_r_for_angle(
     by_feature = result.set_index("feature")
     assert (by_feature.loc[["TES", "VKS_MajRad", "VKS_MinRad"], "statistic"] == "icc").all()
     assert by_feature.loc["VKS_Angle", "statistic"] == "circ_r"
-    assert (by_feature["n"] == 23).all()
+    assert (by_feature["n"] == 24).all()
 
 
 # --- severity (CCA) ------------------------------------------------------
@@ -279,7 +279,7 @@ def test_paired_sessions_matches_known_pooled_count(troughs_df):
     expectation, going in, that per-subtype reliability wouldn't be
     assessable -- same underlying data ssvepBeh's reliability gap used."""
     paired = eeg_features.paired_sessions(troughs_df)
-    assert len(paired) == 22
+    assert len(paired) == 23
 
 
 def test_reliability_table_raises_below_minimum_for_deutan(troughs_df):

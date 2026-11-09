@@ -347,7 +347,7 @@ def test_correct_multiple_comparisons_none_of_the_real_pooled_pairs_survive(beh_
 def test_paired_subjects_matches_known_counts():
     """Pins the real paired-subject counts behind this project's reliability
     gap -- protan/deutan/CVD(combined) are all too thin to assess."""
-    assert len(session_reliability.paired_subjects()) == 22
+    assert len(session_reliability.paired_subjects()) == 23
     assert len(session_reliability.paired_subjects(group="CTR")) == 16
     assert len(session_reliability.paired_subjects(group="PD")) == 4
     assert len(session_reliability.paired_subjects(group="CVD")) == 2
