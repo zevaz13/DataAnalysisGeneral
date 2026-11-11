@@ -41,7 +41,7 @@ runs share a name, so key by xlsx `RunNumber`. Grid `sequence` is 1-based
 Data: `/home/sebas/data/blueRedLinear/BRtest/MET0xx.mat` (same `testData`
 format). Per participant: `base_{NF,YF}` (8 trials), `BR_{NF,YF}_{1,2}` (2
 leading baseline samples + 11 steps). Steps are blue DAC 0-1700 (linear)
-against fixed red 1800. MET050, MET050b, MET051, MET051b, MET052, MET052b, MET053, MET053b, MET054: CTR. Hypothesis: blue-deficient
+against fixed red 1800. MET050, MET050b, MET051, MET051b, MET052, MET052b, MET053, MET053b, MET054, MET054b, MET055: CTR. Hypothesis: blue-deficient
 participants show YF ~ NF, controls separate.
 
 - [x] `notebooks/03_brtest_explore.ipynb`: raw BR curves, normalised to
