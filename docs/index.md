@@ -26,7 +26,8 @@ results; start here if you want to know where something lives.
   seven proposed SSVEP analyses, M6-M10's source spec), `docs/ssvep_summary.md`
   (SSVEP work-to-date + a dated M1-M5 code review), `docs/ssvepbeh_reliability_gaps.md`
   (why the behavioral/EEG individual-differences correlation didn't survive
-  correction, and what would fix it), `docs/experiment_summary.md` (shared
+  correction, and what would fix it), `docs/blueRedLinearFindings.md` (blue/red linear
+  BRtest results, updated as participants are added), `docs/experiment_summary.md` (shared
   experimental context: the stimulus, the metamer concept, why these
   particular measures), `docs/ExperimentalContext` (raw researcher notes the
   above was distilled from).
