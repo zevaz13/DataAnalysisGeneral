@@ -134,7 +134,7 @@ def test_circ_mean_deg_axial_stays_put_for_a_tight_cluster():
 
 def test_paired_sessions_matches_known_count(fm100_df):
     paired = fm100_features.paired_sessions(fm100_df)
-    assert len(paired) == 25
+    assert len(paired) == 26
     assert {"TES_session1", "TES_session2", "VKS_Angle_session1", "VKS_Angle_session2"}.issubset(paired.columns)
 
 
@@ -149,7 +149,7 @@ def test_reliability_table_uses_icc_for_magnitude_features_and_circ_r_for_angle(
     by_feature = result.set_index("feature")
     assert (by_feature.loc[["TES", "VKS_MajRad", "VKS_MinRad"], "statistic"] == "icc").all()
     assert by_feature.loc["VKS_Angle", "statistic"] == "circ_r"
-    assert (by_feature["n"] == 25).all()
+    assert (by_feature["n"] == 26).all()
 
 
 # --- severity (CCA) ------------------------------------------------------
@@ -279,7 +279,7 @@ def test_paired_sessions_matches_known_pooled_count(troughs_df):
     expectation, going in, that per-subtype reliability wouldn't be
     assessable -- same underlying data ssvepBeh's reliability gap used."""
     paired = eeg_features.paired_sessions(troughs_df)
-    assert len(paired) == 24
+    assert len(paired) == 25
 
 
 def test_reliability_table_raises_below_minimum_for_deutan(troughs_df):
@@ -297,7 +297,7 @@ def test_reliability_table_only_checks_the_two_derived_features(troughs_df):
 
 def test_severity_cca_on_real_eeg_data_is_borderline_pooled(merged_eeg):
     """Pins the current M2 finding: the severity CCA between FM100 and EEG
-    (ramp_magnitude, ramp_intercept) is borderline (p=0.058). It was < 0.05
+    (ramp_magnitude, ramp_intercept) is borderline (p=0.052). It was < 0.05
     through MET053; MET054b/MET055 pushed it over."""
     X = merged_eeg[["TES", "VKS_MajRad", "VKS_MinRad"]].to_numpy()
     Y = merged_eeg[["ramp_magnitude", "ramp_intercept"]].to_numpy()
@@ -305,12 +305,12 @@ def test_severity_cca_on_real_eeg_data_is_borderline_pooled(merged_eeg):
     assert 0.05 < result["p_value"] < 0.10
 
 
-def test_type_axis_on_real_eeg_data_is_borderline_pooled(merged_eeg):
+def test_type_axis_on_real_eeg_data_is_significant_pooled(merged_eeg):
     """Pins the current M2 finding: pooled, VKS_Angle vs. the EEG ramp-angle
-    circular correlation is borderline (p=0.0505). It was < 0.05 through
-    MET053."""
+    circular correlation is significant (p=0.034). It was 0.0505 through
+    MET055 session 1; MET055's session-2 FM100 (pooled) moved it back under."""
     result = type_axis.circular_correlation_test(merged_eeg["VKS_Angle"].to_numpy(), merged_eeg["ramp_angle_deg"].to_numpy())
-    assert 0.04 < result["p_value"] < 0.10
+    assert 0.02 < result["p_value"] < 0.05
 
 
 # --- joint_concordance_test (M3) --------------------------------------------

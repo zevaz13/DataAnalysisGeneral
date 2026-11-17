@@ -11,6 +11,13 @@ after adding data). Running it also regenerates the figures below
 
 - Blue (0-1700 DAC, 11 steps of 170) flickers at 10 Hz against fixed red
   (1800 DAC). 3 s stimulus, 750 ms gap.
+- Blue grid change: from MET056 on, 14 steps of 170 over 0-2210. The first 11
+  are the old grid; the upper register is extended. All cross-session
+  analyses use the common 0-1700 grid.
+- **MET055 session 2 setup error:** 14 steps linearly spaced over 0-1700
+  (~131 apart; the upper limit was not raised to 2210). Only 0 and 1700 fall
+  on the common grid. This session is plotted at its true blue levels and left
+  out of every step-aligned and window analysis (see its section below).
 - Runs per session, in order: red baseline NF (8 trials, red vs blue 0),
   BR NF rep 1, BR NF rep 2, red baseline YF, BR YF rep 1, BR YF rep 2. Each
   BR run starts with 2 non-flickering red trials.
@@ -42,12 +49,13 @@ Hypotheses:
 
 ## Current results
 
-Data as of 2026-11-12: 6 participants (MET050-MET055, all CTR, age > 50),
-11 sessions, 5 with both sessions. PES_BY range 15-106. All p-values
+Data as of 2026-11-17: 6 participants (MET050-MET055, all CTR, age > 50),
+12 sessions, 6 with both sessions. MET055 session 2 is off-grid, so the
+analyses below use 11 sessions and 5 two-session pairs (FM100 ICC: 6 pairs). PES_BY range 15-106. All p-values
 uncorrected; many tests were run. Treat everything as leads.
 
 ### Data quality
-- The blue = 0 step falls inside its baseline's min-max in 38/43 reps, but
+- The blue = 0 step falls inside its baseline's min-max in 41/47 reps, but
   sits in the lower half of the baseline trials more often than not.
 - MET050 barely responds (baseline ~0.73 vs non-flicker ~0.63).
 - Rep 1 vs rep 2 agreement per step is weak.
@@ -129,7 +137,7 @@ participant-bootstrap mean and 95% CI.
 | NF | 0.05 | not meaningful* | 0.53 |
 | YF | 0.84 [0.20, 0.98] | 0.80 | 0.58 |
 | NF - YF | 0.09 | 0.23 | -0.04 |
-| PES_BY (FM100) | 0.50 | | |
+| PES_BY (FM100), n = 6 | 0.66 | | |
 
 \* Under NF, blue 0-340 is nearly the baseline stimulus, so `norm` ~1 for
 everyone; there is no between-person spread to repeat.
@@ -154,6 +162,22 @@ repeat.
 ![Per-step ICC](figures/brlinear_step_icc.png)
 ICC(A,1) per blue step with 95% CIs. Dotted lines at 0.5 and 0.75.
 
+### MET055 session 2 (setup error, off-grid)
+Assessed in the last section of `04_brtest_fm100.ipynb`.
+- The run is usable as data: interpolating it onto the common grid and
+  averaging its own in-range steps give window features within ~0.04 of each
+  other.
+- YF repeats across MET055's sessions (mean 0.79 vs 0.76). Added as a sixth
+  pair (interpolated), YF ICCs hold or rise: mean 0.84 -> 0.87, high 0.58 ->
+  0.67.
+- NF does not: session 2 NF sits below baseline above ~900 DAC (0.72-0.87;
+  below every on-grid session from ~1300 up) and the NF - YF gap collapses
+  (high 0.44 -> 0.01). Part of it is a higher NF baseline (median 1.24 vs
+  0.97); raw NF at high blue is also lower. PES_BY barely moves (15 -> 18).
+  Added as a pair, NF ICCs drop (high 0.53 -> 0.19).
+- Decision for now: kept out of the main analyses. Its YF features can be
+  used via interpolation if a larger n is needed.
+
 ## Open questions
 
 - Which blue step is missing in MET052 session 1 `BR_YF_2`.
@@ -166,3 +190,7 @@ ICC(A,1) per blue step with 95% CIs. Dotted lines at 0.5 and 0.75.
 
 - 2026-11-12: first analysis, 6 participants / 11 sessions (MET050-MET055,
   MET055 session 1 only).
+- 2026-11-17: MET055 session 2 added (14 steps over 0-1700 by mistake;
+  off-grid, assessed separately). Main results unchanged; FM100 PES_BY ICC
+  0.50 -> 0.66 with the sixth pair. Notebook now handles 14-step sessions
+  (0-2210) for MET056 on.

@@ -330,15 +330,15 @@ def test_correct_multiple_comparisons_fdr_is_less_conservative_than_holm():
     assert fdr["significant"].sum() >= holm["significant"].sum()
 
 
-def test_correct_multiple_comparisons_only_one_real_pooled_pair_survives_fdr(beh_df):
-    """Pins the current finding: with 51 subjects and 25 pairwise tests, only
-    orientation_deg vs ramp_slope_red clears FDR (p_corrected=0.035). Through
-    MET053 nothing survived; MET054b/MET055 tipped it."""
+def test_correct_multiple_comparisons_none_of_the_real_pooled_pairs_survive_fdr(beh_df):
+    """Pins the current finding: with 51 subjects and 25 pairwise tests,
+    nothing clears FDR (best p_corrected=0.134). Through MET055 session 1,
+    orientation_deg vs ramp_slope_red survived (p_corrected=0.035); MET055's
+    session-2 clicks (pooled into its behavioral shape features) undid it."""
     table = correlation.subject_features_table(beh_df, session=1)
     pooled = correlation.feature_correlations(table)
     corrected = correlation.correct_multiple_comparisons(pooled, method="fdr_bh")
-    survivors = corrected[corrected["significant"]]
-    assert list(zip(survivors["beh_feature"], survivors["eeg_feature"])) == [("orientation_deg", "ramp_slope_red")]
+    assert not corrected["significant"].any()
 
 
 # --- session_reliability -----------------------------------------------------
@@ -347,8 +347,8 @@ def test_correct_multiple_comparisons_only_one_real_pooled_pair_survives_fdr(beh
 def test_paired_subjects_matches_known_counts():
     """Pins the real paired-subject counts behind this project's reliability
     gap -- protan/deutan/CVD(combined) are all too thin to assess."""
-    assert len(session_reliability.paired_subjects()) == 24
-    assert len(session_reliability.paired_subjects(group="CTR")) == 17
+    assert len(session_reliability.paired_subjects()) == 25
+    assert len(session_reliability.paired_subjects(group="CTR")) == 19
     assert len(session_reliability.paired_subjects(group="PD")) == 4
     assert len(session_reliability.paired_subjects(group="CVD")) == 2
     assert len(session_reliability.paired_subjects(group="CVD", subgroup="protan")) == 2
@@ -368,7 +368,7 @@ def test_session_correlation_comparison_raises_below_minimum(beh_df):
 def test_session_overlap_comparison_returns_one_row_per_session(beh_df, runmap_df, baselines_df, metadata_df):
     result = session_reliability.session_overlap_comparison(beh_df, runmap_df, baselines_df, metadata_df, group="CTR", n_perm=200, seed=0)
     assert list(result["session"]) == [1, 2]
-    assert (result["n"] == 17).all()
+    assert (result["n"] == 19).all()
 
 
 def test_session_correlation_comparison_returns_both_sessions(beh_df):

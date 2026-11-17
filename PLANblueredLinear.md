@@ -66,8 +66,15 @@ exploration (01-03) stays as is.
 - [ ] Artifact handling without ICA (epoch rejection, EOG regression); test blink impact on the 10 Hz score
 
 Open: MET052 `BR_YF_2` has 10 steps (unknown which); session 1 YF uses rep 1 only.
+Open: decide whether MET055b's YF features (interpolated) join the main analyses.
 
-### Findings so far (n = 6 participants, 11 sessions; updated 2026-11-12)
+Blue grid change: from MET056 on, BR runs have 14 steps of 170 over 0-2210
+(first 11 = old 0-1700 grid). MET055b is a setup error: 14 steps over 0-1700
+(upper limit not raised), off the common grid. `04` plots it at its true
+levels, excludes it from step-aligned/window analyses, and assesses it in its
+last section. Cross-session analyses use the common 0-1700 grid.
+
+### Findings so far (n = 6 participants, 11 on-grid sessions + MET055b; updated 2026-11-17)
 Normalization: score / median of the 8-trial baseline (same filter). Floor is reference only.
 - NF sits above YF almost everywhere. The YF curve (relative to its own baseline) carries most of the FM100 relation: better PES_BY -> YF drops more at high blue. YF mean/high vs PES_BY: rho +0.59/+0.58 over sessions (p ~0.06), +0.83 over participants (p = 0.04). NF - YF gap: rho ~ -0.55 (p 0.06-0.09). Uncorrected, many tests; a lead, not a result.
 - Dropping MET050 barely changes YF high (+0.62) or gap high (-0.60).
@@ -76,5 +83,5 @@ Normalization: score / median of the 8-trial baseline (same filter). Floor is re
 - Anchor: blue = 0 step falls inside the baseline min-max in 38/43 reps, but sits in the lower half of the baseline trials more often than not.
 - Lead: NF curve shape repeats better across sessions than YF (mean s1-vs-s2 rho 0.23 vs -0.07); level differences are similar (mean |s1 - s2| 0.107 vs 0.109).
 - Rep 1 vs rep 2 agreement per step is weak.
-- ICC(A,1), n = 5: YF mean 0.84 [0.20, 0.98], YF low 0.80, YF high 0.58, NF high 0.53, NF mean 0.05, gap ~0, PES_BY 0.50. YF is the most repeatable measure. NF low is meaningless: blue 0-340 under NF is nearly the baseline stimulus, so norm ~1 for everyone and there is no between-person spread to repeat.
+- ICC(A,1), n = 5: YF mean 0.84 [0.20, 0.98], YF low 0.80, YF high 0.58, NF high 0.53, NF mean 0.05, gap ~0, PES_BY 0.66 (n = 6). YF is the most repeatable measure. NF low is meaningless: blue 0-340 under NF is nearly the baseline stimulus, so norm ~1 for everyone and there is no between-person spread to repeat.
 - Lead: pooled YF (normalized) shows two dips, ~510 and ~1360; NF is flatter.
