@@ -431,6 +431,55 @@ On the common 0-1700 grid it weakens the NF - YF gap relation with PES_BY
 its baseline at high blue, as in MET055b) while YF high holds. Details:
 `docs/blueRedLinearFindings.md`.
 
+## What changed when MET057 joined
+
+Re-run on 2026-11-19 after adding session 1 of **MET057** (healthy control,
+FM100 TES 128 / PES_BY 65): EEG grid, 18 manual presses, FM100 and the
+blue/red linear test (second participant on the 0-2210 blue grid). One new
+subject: HC goes from n=28 to n=29 at EEG/FM100 session 1 and from 30 to 31
+for clicks. No second session, so test-retest counts stay put. The "before"
+column is the state after MET056 (the section above).
+
+| Result | Before (after MET056) | Now, with MET057 |
+|---|---|---|
+| EEG, HC session-1 trough location (red, green) | 1778, 889 | 1778, 889 |
+| EEG, HC vs protan / deutan (ramp_slope_red, Mann-Whitney) | p=0.0068 / p=0.13 | p=0.0054 / p=0.11 |
+| EEG, cluster test protan vs HC / deutan vs HC (largest cluster p) | 0.013 / 0.008 | 0.015 / 0.018 |
+| EEG, CVD gamut specificity (CTR not at bound) | 0.75 (21/28) | 0.76 (22/29) |
+| EEG, PC1 PD vs CTR (Welch) | p=0.72 | p=0.71 |
+| EEG, protan vs deutan cluster seeds (of 200) | 0 | 0 |
+| Behavioral, HC vs PD, mean click location (Hotelling) | p=0.0006 | p=0.0004 |
+| Behavioral, HC vs PD, `orientation_deg` / `along_var` / `perp_var` (uncorrected) | p=0.010 / p=0.050 / p=0.064 | p=0.009 / **p=0.052** / p=0.079 |
+| Behavioral, PD vs HC within-session scatter (Mann-Whitney) | p=0.050 (552 vs 327) | **p=0.052** (552 vs 329) |
+| FM100, CTR vs PD (5 magnitude features, uncorrected) | p=0.010-0.026 | p=0.014-0.031 |
+| FM100, HC vs PD offset (95% CI, p, R²) | 0.98 ([0.24, 1.71], p=0.013, 0.52) | 0.95 ([0.20, 1.71], p=0.011, 0.54) |
+| FM100, offset after dropping flagged controls (R²) | 1.07 (0.47) | 1.03 (0.50) |
+| FM100 vs behavioral, severity (pooled) | r=0.71, p=0.0002 (n=56) | r=0.71, p=0.0002 (n=57) |
+| FM100 vs behavioral, type/axis (pooled) | r=0.41, p=0.0024 (n=56) | r=0.41, p=0.0024 (n=57) |
+| FM100 vs EEG, severity (pooled) | r=0.44, p=0.057 (n=53) | r=0.44, p=0.056 (n=54) |
+| FM100 vs EEG, type/axis (pooled) | r=-0.30, p=0.038 (n=53) | r=-0.29, p=0.039 (n=54) |
+| Clicks vs EEG, type/axis (pooled) | r=-0.21, p=0.13 (n=52) | r=-0.21, p=0.11 (n=53) |
+| Three-way joint concordance (FM100, clicks, EEG) | p=0.0004 | p=0.0008 |
+| Clicks vs EEG pairs (25 tests, FDR), pooled | none survives (0.135) | none survives (0.119) |
+
+**The two borderline behavioral results tip back over 0.05.** HC vs PD
+`along_var` and PD's within-session scatter, both at p=0.050 last update,
+are now at p=0.052. MET057's scatter (421) sits above the HC median, so it
+narrows the gap a little. As before, these have crossed 0.05 in both
+directions with single controls and should not be quoted as established.
+Everything else moves within its usual range. MET057 is a control with a
+fairly high FM100 score for its group (TES 128); the outlier rule flags it
+on 1 of 6 features (`VKS_MajRad`), below the 4-of-6 bar, so the excluded
+controls are still MET020 and MET050. On the EEG grid it is not at bound and
+its trough is at the HC location (1778, 889).
+
+Blue/red linear test: MET057 is the second session on the 0-2210 grid. YF
+high vs PES_BY holds over sessions (+0.58, p=0.037) but not over
+participants (p=0.14), and the YF dip at 1360 now has a CI below 0. MET057's
+NF is also below baseline at high blue, so all three 14-step sessions share
+that pattern; a setup check is the next step. Details:
+`docs/blueRedLinearFindings.md`.
+
 ## The shape of the project
 
 Several ways of looking at the same underlying question -- does someone
