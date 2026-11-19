@@ -378,7 +378,7 @@ def test_triangle_completion_on_real_data(merged_all_three):
     ramp-angle), pooled, is NOT significant on its own -- this is the
     result the joint test is contrasted against."""
     result = type_axis.circular_correlation_test(merged_all_three["orientation_deg"].to_numpy(), merged_all_three["ramp_angle_deg"].to_numpy())
-    assert result["n"] == 51
+    assert result["n"] == 53
     assert result["p_value"] > 0.05
 
 

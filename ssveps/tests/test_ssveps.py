@@ -48,6 +48,8 @@ def axes():
 # --- axis orientation ------------------------------------------------------
 # The one that was wrong. ssveps/CTRdata.png is an independently produced
 # reference for this exact group; its minimum sits at red 2133 / green 889.
+# From MET056 on, red 1778 and red 2133 (same green) are tied to 1e-4 and the
+# argmin sits at 1778; either cell still proves the red/green orientation.
 
 
 def test_ctr_trough_matches_reference_image(data, axes):
@@ -55,7 +57,7 @@ def test_ctr_trough_matches_reference_image(data, axes):
     red_vals, green_vals = axes
     grid = analysis.group_grid(runmap, baselines, meta, 1, group="CTR", normalize=analysis.DEFAULT_NORMALIZE)
     loc = analysis.trough_location(grid, red_vals, green_vals)
-    assert loc["red"] == pytest.approx(2133.3, abs=1)
+    assert round(loc["red"], 1) in (1777.8, 2133.3)
     assert loc["green"] == pytest.approx(888.9, abs=1)
 
 
@@ -65,7 +67,7 @@ def test_grid_is_indexed_red_then_green(data, axes):
     red_vals, green_vals = axes
     grid = analysis.group_grid(runmap, baselines, meta, 1, group="CTR", normalize=analysis.DEFAULT_NORMALIZE)
     red_idx, green_idx = np.unravel_index(np.argmin(grid), grid.shape)
-    assert red_vals[red_idx] == pytest.approx(2133.3, abs=1)
+    assert round(red_vals[red_idx], 1) in (1777.8, 2133.3)
     assert green_vals[green_idx] == pytest.approx(888.9, abs=1)
     # SSVEP amplitude falls off with red: averaging over green, the red=0 edge
     # must be the brightest. This is direction-sensitive, unlike a correlation.

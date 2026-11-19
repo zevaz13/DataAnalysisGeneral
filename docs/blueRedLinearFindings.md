@@ -49,13 +49,15 @@ Hypotheses:
 
 ## Current results
 
-Data as of 2026-11-17: 6 participants (MET050-MET055, all CTR, age > 50),
-12 sessions, 6 with both sessions. MET055 session 2 is off-grid, so the
-analyses below use 11 sessions and 5 two-session pairs (FM100 ICC: 6 pairs). PES_BY range 15-106. All p-values
+Data as of 2026-11-19: 8 participants (MET050-MET057, all CTR, age > 50),
+14 sessions, 6 with both sessions. MET055 session 2 is off-grid, so the
+analyses below use 13 sessions and 5 two-session pairs (FM100 ICC: 6 pairs).
+MET056 and MET057 (14 steps, 0-2210) enter every analysis through their first
+11 steps; their 1870-2210 steps are in the per-session plots only. PES_BY range 15-106. All p-values
 uncorrected; many tests were run. Treat everything as leads.
 
 ### Data quality
-- The blue = 0 step falls inside its baseline's min-max in 41/47 reps, but
+- The blue = 0 step falls inside its baseline's min-max in 48/55 reps, but
   sits in the lower half of the baseline trials more often than not.
 - MET050 barely responds (baseline ~0.73 vs non-flicker ~0.63).
 - Rep 1 vs rep 2 agreement per step is weak.
@@ -73,19 +75,24 @@ each rep (same stimulus).
 ### M1. NF vs YF against FM100 blue-yellow
 - NF sits above YF at almost every step.
 - The YF curve carries most of the FM100 relation: better blue-yellow ->
-  YF drops further below its baseline, especially at high blue.
+  YF drops further below its baseline, especially at high blue. YF high is
+  the one feature that has held through MET056 and MET057.
 
-| Feature vs PES_BY | rho sessions (p), n = 11 | rho participants (p), n = 6 |
-|---|---|---|
-| YF mean | +0.59 (0.056) | +0.83 (0.042) |
-| YF high | +0.58 (0.060) | +0.83 (0.042) |
-| NF - YF mean | -0.55 (0.083) | |
-| NF - YF high | -0.58 (0.060) | |
+| Feature vs PES_BY | rho sessions (p), n = 13 | rho participants (p), n = 8 | before MET057 (n = 12 / 7) |
+|---|---|---|---|
+| YF mean | +0.45 (0.13) | +0.45 (0.26) | +0.49 (0.11) / +0.64 (0.12) |
+| YF high | +0.58 (0.037) | +0.57 (0.14) | +0.63 (0.028) / +0.79 (0.036) |
+| NF - YF mean | -0.30 (0.32) | -0.38 (0.35) | -0.32 (0.31) / -0.39 (0.38) |
+| NF - YF high | -0.36 (0.23) | -0.40 (0.32) | -0.35 (0.27) / -0.39 (0.38) |
 
-- Dropping MET050: YF high +0.62, gap high -0.60. The result does not rest on
-  the weakest responder.
-- Signs fit hypothesis 1: worse blue vision -> YF stays nearer baseline ->
-  curves converge.
+- MET057 (PES_BY 65, mid-range) has a low YF at high blue (0.69), which
+  is not what its mid-range PES_BY predicts; YF high over sessions holds
+  (p = 0.037), over participants it drops below significance (p = 0.14).
+- Dropping MET050: YF high +0.54 (0.089), gap high -0.26. With MET057 in,
+  YF high now leans on MET050 (was +0.64, p = 0.048, without MET050).
+- Signs still fit hypothesis 1, but the gap result was carried by the YF
+  side: MET056 has the second-best PES_BY (16) yet almost no NF - YF gap,
+  because its NF curve sits below baseline (see its section below).
 
 
 ![NF and YF curves colored by PES_BY](figures/brlinear_curves_by_pesby.png)
@@ -111,10 +118,11 @@ across sessions. Band = participant-bootstrap 95% CI. Below 0 = smaller gap
 with worse blue-yellow score.
 
 ### M2. Minimum at 1360?
-- NF: no dip. Contrast 1360 - mean(0, 1700) = +0.06, 95% CI [+0.04, +0.09];
+- NF: no dip. Contrast 1360 - mean(0, 1700) = +0.04, 95% CI [+0.00, +0.07];
   1360 is higher than the ends.
-- YF: -0.06, 95% CI [-0.16, +0.03], 90% of bootstraps below 0. Leans toward
-  a dip, not conclusive.
+- YF: -0.09, 95% CI [-0.18, -0.01], 99% of bootstraps below 0 (97% before
+  MET057, 90% before MET056). The CI now excludes 0: a dip at 1360 under YF,
+  uncorrected.
 - Per-session minima land almost anywhere along the blue axis.
 - Lead: the pooled YF curve shows two shallow dips, ~510 and ~1360. NF is
   flatter.
@@ -178,6 +186,37 @@ Assessed in the last section of `04_brtest_fm100.ipynb`.
 - Decision for now: kept out of the main analyses. Its YF features can be
   used via interpolation if a larger n is needed.
 
+### MET056 (first session on the 0-2210 grid)
+- PES_BY 16 (second best). Baseline medians NF 1.38, YF 1.14, in the usual
+  range (MET051-MET054: 1.2-1.5).
+- NF sits below baseline at almost every step (norm 0.73-1.00) and falls
+  from ~850 up; at 1360-1700 (0.80, 0.76, 0.73) it is the lowest of every
+  on-grid session (others 0.81-1.21). YF dips to 0.76 at 1360-1530 and comes
+  back. Result: the NF - YF gap is negative at 1700 (0.74 vs 0.94).
+  Per-session minimum: NF 1700, YF 1360.
+- Extended steps (norm, NF / YF): 1870 0.82 / 1.04, 2040 0.97 / 0.95,
+  2210 0.82 / 1.16. YF climbs back above baseline past 1700; NF stays below.
+  One session, so no pooled curve above 1700 yet.
+- Lead: the two sessions recorded with 14-step runs (MET055b, MET056, one
+  day apart) are the only ones with NF this far below baseline at high blue.
+  Worth checking whether anything else in the setup changed with the new
+  run length (stimulus order, timing, calibration) before reading this as a
+  property of the participants. MET057 (below) partly follows the pattern.
+
+### MET057 (second session on the 0-2210 grid)
+- CTR, PES_BY 65 (TES 128; only MET050 and MET051 session 2 score worse
+  among BRtest sessions). Baseline medians NF 1.46, YF 1.30, usual range.
+- NF drifts down from ~1000 up (0.78-0.86 at 1020-1700); NF high 0.84 is the
+  second lowest of the on-grid sessions after MET056 (0.77); the eleven
+  11-step sessions span 0.87-1.20. YF falls further (0.65-0.72 at 1360-1700),
+  so unlike MET056 the NF - YF gap stays positive (high 0.16).
+  Per-session minimum: NF 1190, YF 1530.
+- Extended steps (norm, NF / YF): 1870 0.81 / 0.66, 2040 0.72 / 0.66,
+  2210 0.82 / 0.75. Both stay below baseline past 1700 (MET056's YF climbed
+  back above 1).
+- All three 14-step sessions (MET055b, MET056, MET057) now have the lowest NF
+  at high blue. The setup-change check above is more pressing.
+
 ## Open questions
 
 - Which blue step is missing in MET052 session 1 `BR_YF_2`.
@@ -194,3 +233,11 @@ Assessed in the last section of `04_brtest_fm100.ipynb`.
   off-grid, assessed separately). Main results unchanged; FM100 PES_BY ICC
   0.50 -> 0.66 with the sixth pair. Notebook now handles 14-step sessions
   (0-2210) for MET056 on.
+- 2026-11-18: MET056 session 1 added, first on the 0-2210 grid (first 11
+  steps on the common grid). YF high vs PES_BY holds (+0.63, p = 0.028);
+  YF mean and the NF - YF gap weaken (gap high -0.58 -> -0.35). ICCs
+  unchanged (no second session yet).
+- 2026-11-19: MET057 session 1 added (14 steps, 0-2210; PES_BY 65). YF high
+  vs PES_BY holds over sessions (+0.58, p = 0.037), not over participants
+  (+0.57, p = 0.14). YF dip at 1360 now has a CI below 0. MET057's NF is also
+  below baseline at high blue: all three 14-step sessions share this.
