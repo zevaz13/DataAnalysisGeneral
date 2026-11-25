@@ -67,7 +67,7 @@ exploration (01-03) stays as is.
 
 Open: MET052 `BR_YF_2` has 10 steps (unknown which); session 1 YF uses rep 1 only.
 Open: decide whether MET055b's YF features (interpolated) join the main analyses.
-Open: MET055b, MET056 and MET057 (all 14-step runs) show the lowest NF at high blue; check for a setup change.
+Open: MET055b, MET056, MET056b and MET057 (all 14-step runs) show the lowest NF at high blue; check for a setup change.
 
 Blue grid change: from MET056 on, BR runs have 14 steps of 170 over 0-2210
 (first 11 = old 0-1700 grid). MET055b is a setup error: 14 steps over 0-1700
@@ -75,16 +75,14 @@ Blue grid change: from MET056 on, BR runs have 14 steps of 170 over 0-2210
 levels, excludes it from step-aligned/window analyses, and assesses it in its
 last section. Cross-session analyses use the common 0-1700 grid.
 
-### Findings so far (n = 8 participants, 13 on-grid sessions + MET055b; updated 2026-11-19)
+### Findings so far (n = 8 participants, 14 on-grid sessions + MET055b, 6 on-grid pairs; updated 2026-11-25)
 Normalization: score / median of the 8-trial baseline (same filter). Floor is reference only.
-- NF sits above YF almost everywhere. The YF curve (relative to its own baseline) carries most of the FM100 relation: better PES_BY -> YF drops more at high blue. YF high vs PES_BY: rho +0.58 over sessions (p = 0.037), +0.57 over participants (p = 0.14; was +0.79, p = 0.036, before MET057); YF mean weaker (+0.45, p = 0.13). NF - YF gap weakened with MET056: high -0.36 (p = 0.23; was -0.58). Uncorrected, many tests; a lead, not a result.
-- Dropping MET050: YF high +0.54 (p = 0.089), gap high -0.26 (before MET057: +0.64, p = 0.048).
-- MET057 (PES_BY 65): NF high 0.84, second lowest on-grid after MET056; YF falls further, so its gap stays positive (0.16). All three 14-step sessions have the lowest NF at high blue.
-- MET056 (PES_BY 16) has NF below baseline at high blue (0.73-0.80 at 1360-1700, lowest of all on-grid sessions), so almost no gap. MET055b looked the same; both are the 14-step sessions. Check the setup before reading it as a participant effect.
-- No dip at 1360 under NF: 1360 is above the mean of the ends (+0.04, 95% CI [+0.00, +0.07]). YF: -0.09 [-0.18, -0.01], CI now below 0 with MET057. The YF curve is what drops at high blue.
-- Mean vs median baseline: per-condition differences < 0.08; correlations move by at most ~0.15 (median reported).
-- Anchor: blue = 0 step falls inside the baseline min-max in 48/55 reps, but sits in the lower half of the baseline trials more often than not.
-- Lead: NF curve shape repeats better across sessions than YF (mean s1-vs-s2 rho 0.23 vs -0.07); level differences are similar (mean |s1 - s2| 0.107 vs 0.109).
-- Rep 1 vs rep 2 agreement per step is weak.
-- ICC(A,1), n = 5: YF mean 0.84 [0.20, 0.98], YF low 0.80, YF high 0.58, NF high 0.53, NF mean 0.05, gap ~0, PES_BY 0.66 (n = 6). YF is the most repeatable measure. NF low is meaningless: blue 0-340 under NF is nearly the baseline stimulus, so norm ~1 for everyone and there is no between-person spread to repeat.
-- Lead: pooled YF (normalized) shows two dips, ~510 and ~1360; NF is flatter.
+Detail and before/after numbers: `docs/blueRedLinearFindings.md`.
+- NF sits above YF almost everywhere. The FM100 relation that lived in the YF curve is gone with MET056b: YF high vs PES_BY +0.36 over sessions (p = 0.21; was +0.58, p = 0.037), +0.31 over participants (p = 0.46). Gap high -0.15 (p = 0.61). Nothing significant now.
+- MET056b (PES_BY 22): NF below baseline at every step again (high 0.79; MET056's two sessions are the two lowest), YF above baseline at high blue (1.19, highest of all), gap -0.39 (lowest). Low YF baseline that day (0.96 vs 1.14).
+- All four 14-step sessions (MET055b, MET056, MET056b, MET057) have the lowest NF at high blue. MET056 repeats it a week apart, but it is still confounded with the setup change.
+- No dip at 1360 under NF (+0.04, 95% CI [+0.01, +0.07]). YF: -0.08 [-0.15, -0.01].
+- Anchor: blue = 0 step inside the baseline min-max in 50/59 reps, lower half more often than not.
+- ICC(A,1), n = 6: NF high 0.77, YF low 0.83, YF mean 0.71, NF mean 0.58, gap 0.38-0.66, YF high 0.26, PES_BY 0.71 (n = 7). MET056 as the sixth pair moved most ICCs (n = 5: YF mean 0.84, NF high 0.53, YF high 0.58).
+- 1870-2210 steps: MET056 s1 vs s2 close (NF 0.82/0.97/0.82 vs 0.79/0.90/0.80).
+- NF curve shape repeats better than YF (mean s1-vs-s2 rho 0.15 vs -0.10). Rep 1 vs rep 2 agreement per step is weak.
